@@ -1,0 +1,63 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    name: Build Windows release
+    runs-on: windows-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Prepare native dependencies
+        shell: pwsh
+        run: ./scripts/setup-build-dependencies.ps1
+
+      - name: Run tests
+        shell: pwsh
+        run: dotnet test tests/TransReader.Core.Tests/TransReader.Core.Tests.csproj -c Release --nologo
+
+      - name: Install Inno Setup compiler
+        shell: pwsh
+        run: |
+          $url = 'https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe'
+          $installer = Join-Path $env:RUNNER_TEMP 'innosetup-6.7.3.exe'
+          $destination = Join-Path $env:RUNNER_TEMP 'InnoSetup6'
+          Invoke-WebRequest -Uri $url -OutFile $installer
+          $expected = '9c73c3bae7ed48d44112a0f48e66742c00090bdb5bef71d9d3c056c66e97b732'
+          $actual = (Get-FileHash -Algorithm SHA256 $installer).Hash.ToLowerInvariant()
+          if ($actual -ne $expected) { throw "Inno Setup checksum mismatch: $actual" }
+          $process = Start-Process -FilePath $installer -ArgumentList @(
+            '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CURRENTUSER', "/DIR=$destination"
+          ) -WindowStyle Hidden -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Inno Setup installation failed: $($process.ExitCode)" }
+
+      - name: Build and package
+        shell: pwsh
+        run: |
+          $version = '${{ github.ref_name }}'.TrimStart('v')
+          $iscc = Join-Path $env:RUNNER_TEMP 'InnoSetup6\ISCC.exe'
+          ./scripts/publish.ps1 -Version $version -InnoSetupPath $iscc
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          generate_release_notes: true
+          files: |
+            artifacts/release/TransReader-v*-win-x64-portable.zip
+            artifacts/release/TransReader-v*-win-x64-setup.exe
+            artifacts/release/TransReader-v*-SHA256SUMS.txt

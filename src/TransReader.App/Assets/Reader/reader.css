@@ -1,0 +1,145 @@
+/* ===== 设计令牌 ===== */
+:root{color-scheme:light dark;--bg:#fff;--fg:#202124;--muted:#5f6368;--line:#e4e7eb;--code:#f4f5f7;--quote:#52606d;--accent:#315fd4;--marker:#344054;--accent-soft:#eef3ff;--danger:#b42318;--danger-bg:#fee4e2}
+html[data-theme="dark"]{--bg:#202124;--fg:#f2f3f5;--muted:#b7bbc2;--line:#45484f;--code:#292c32;--quote:#c1c7d0;--accent:#91adff;--marker:#d0d5dd;--accent-soft:#293652;--danger:#ffb4ab;--danger-bg:#4b2525}
+
+/* ===== 全局基底（统一 border-box：任何 width:100% + padding 都不再越界） ===== */
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:"Segoe UI","Microsoft YaHei UI",sans-serif;font-size:16px;line-height:1.75;overflow:hidden}
+button,textarea{font:inherit}
+[hidden]{display:none!important}
+
+/* ===== 译文视图 ===== */
+.translation-view{height:100%;overflow:auto;padding:0 24px 24px}
+#content{max-width:920px;margin:0 auto;min-width:0;overflow-wrap:break-word;word-break:normal;text-wrap:pretty}
+h1,h2,h3,h4{line-height:1.38;margin:1.15em 0 .5em;font-weight:650;text-wrap:balance}
+h1{font-size:1.38rem}
+h2{font-size:1.28rem;border-bottom:1px solid var(--line);padding-bottom:.22em}
+h3{font-size:1.14rem}
+h4{font-size:1.04rem}
+#content>:first-child{margin-top:0}
+p{margin:.62em 0}
+ul,ol{margin:.65em 0;padding-left:1.65em}
+li{margin:.18em 0;padding-left:.12em}
+li>p{margin:.28em 0}
+li::marker{color:var(--marker);font-family:"Cascadia Mono",Consolas,monospace;font-weight:600;font-variant-numeric:tabular-nums}
+li>ul,li>ol{margin:.28em 0;padding-left:1.55em}
+blockquote{margin:.9em 0;padding:.25em .9em;border-left:3px solid var(--accent);color:var(--quote);background:var(--code)}
+pre{padding:13px;overflow:auto;border-radius:8px;background:var(--code)}
+code{font-family:Consolas,"Cascadia Mono",monospace;background:var(--code);padding:.1em .28em;border-radius:4px}
+pre code{padding:0}
+.table-scroll{max-width:100%;margin:.9em 0;overflow-x:auto;border:1px solid var(--line);border-radius:7px}
+table{width:100%;min-width:max-content;border-collapse:collapse;margin:0}
+th,td{border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:.42em .68em;text-align:left;vertical-align:top}
+tr:last-child>th,tr:last-child>td{border-bottom:0}
+th:last-child,td:last-child{border-right:0}
+th{background:var(--code);font-weight:600}
+a{color:var(--accent)}
+hr{border:0;border-top:1px solid var(--line);margin:1.35em 0}
+.katex{line-height:1.2}
+.katex-display{max-width:100%;margin:.85em 0;overflow-x:auto;overflow-y:hidden;padding:.28em 2px;text-align:center}
+.katex-display>.katex{white-space:nowrap}
+body.updating #content{opacity:.985}
+body.final #content{animation:finalize .2s ease-out}
+@keyframes finalize{from{opacity:.72}to{opacity:1}}
+
+/* ===== 选区浮条 ===== */
+.selection-toolbar{position:fixed;z-index:20;display:flex;gap:4px;padding:5px;background:var(--bg);border:1px solid var(--line);border-radius:9px;box-shadow:0 5px 20px #0003}
+.selection-toolbar button{min-height:36px;border:0;border-radius:7px;padding:6px 12px;background:var(--code);color:var(--fg);cursor:pointer}
+.selection-toolbar button:hover{filter:brightness(.96)}
+
+/* ===== AI 阅读助手：整体布局（Copilot 风——克制、内容优先） ===== */
+.assistant-view{height:100%;min-height:0;display:grid;grid-template-columns:152px minmax(0,1fr);background:var(--bg)}
+.assistant-view button{border:0;background:transparent;color:var(--fg);cursor:pointer}
+.assistant-view button:disabled{opacity:.5;cursor:default}
+
+/* 话题侧栏 */
+.topic-sidebar{min-width:0;overflow:auto;padding:14px 8px;border-right:1px solid var(--line)}
+.topic-sidebar-heading{padding:0 10px 8px;color:var(--muted);font-size:11px;font-weight:600;letter-spacing:.04em}
+.topic-list,.mobile-topic-list{display:flex;flex-direction:column;gap:2px}
+.topic-item{display:grid;grid-template-columns:30px minmax(0,1fr);gap:7px;width:100%;padding:6px 8px;border-radius:6px;text-align:left}
+.topic-item:hover{background:var(--code)}
+.topic-item.active{background:var(--accent-soft);color:var(--accent);box-shadow:inset 2px 0 0 0 var(--accent)}
+.topic-page{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.topic-item.active .topic-page{color:var(--accent)}
+.topic-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
+.mobile-history{display:none}
+
+/* 主区：顶栏 / 对话 / 空状态 / 输入区 */
+.assistant-main{min-width:0;min-height:0;display:grid;grid-template-rows:auto minmax(0,1fr) auto auto;position:relative}
+
+/* 顶栏：细一行上下文（页码 + 模型徽章），下挂可折叠原文引用 */
+.conversation-context{padding:10px 20px;border-bottom:1px solid var(--line)}
+.assistant-context-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;max-width:720px;margin:0 auto;width:100%}
+.assistant-page{font-size:12px;font-weight:600;color:var(--muted)}
+.model-badge{max-width:58%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:2px 10px;border:1px solid var(--line);border-radius:999px;color:var(--muted);font-size:11px;font-weight:600;line-height:1.6}
+.model-badge.local{color:var(--accent);background:var(--accent-soft);border-color:transparent}
+.selection-card{max-width:720px;margin:8px auto 0;border:1px solid var(--line);border-radius:8px;background:var(--code)}
+.selection-card summary{cursor:pointer;padding:6px 10px;font-size:12px;font-weight:600;color:var(--muted)}
+.selection-card blockquote{max-height:80px;overflow:auto;margin:0;padding:0 10px 8px;border:0;background:transparent;font-size:13px;line-height:1.55;color:var(--quote)}
+
+/* 对话流：居中阅读列；assistant 扁平全文 + ✦ 标记，user 右侧柔和小泡 */
+.conversation{min-height:0;overflow:auto;display:flex;flex-direction:column;gap:18px;max-width:720px;width:100%;margin:0 auto;padding:20px 24px 28px}
+.message{overflow-wrap:anywhere;min-width:0}
+.message p:first-child{margin-top:0}
+.message p:last-child{margin-bottom:0}
+.message pre,.message .katex-display,.message .table-scroll{max-width:100%;overflow-x:auto}
+.message.assistant{position:relative;align-self:stretch;padding:0 0 16px 26px;border-bottom:1px solid var(--line);font-size:14.5px;line-height:1.75}
+.message.assistant:last-child{border-bottom:0}
+.message.assistant::before{content:'\2726';position:absolute;left:0;top:1px;color:var(--accent);font-size:13px;line-height:1.75}
+.message.assistant.pending::after{content:'\258D';color:var(--accent);animation:blink .8s infinite;margin-left:2px}
+@keyframes blink{50%{opacity:0}}
+.message.user{align-self:flex-end;max-width:80%;padding:8px 13px;border-radius:12px 12px 4px 12px;background:var(--accent-soft);font-size:14px;line-height:1.6}
+
+/* 空状态：图标 + 一行引导，无盒子卡片 */
+.assistant-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;overflow:auto;padding:28px 18px;pointer-events:none}
+.empty-panel{max-width:380px;text-align:center;pointer-events:auto}
+.empty-icon{display:flex;justify-content:center;color:var(--accent);margin-bottom:12px}
+.empty-icon svg{width:38px;height:38px}
+.empty-title{font-size:15px;font-weight:600;color:var(--fg);margin-bottom:6px}
+.empty-intro{margin:0;font-size:13px;line-height:1.7;color:var(--muted)}
+
+/* 错误条 */
+.assistant-error{margin:8px auto 0;max-width:720px;width:calc(100% - 40px);padding:8px 12px;color:var(--danger);background:var(--danger-bg);border-radius:8px;font-size:13px}
+
+/* Composer：chips 在上，悬浮圆角输入卡在下 */
+.assistant-composer{max-width:720px;width:100%;margin:0 auto;padding:8px 20px 14px}
+.preset-chips{display:flex;gap:6px;flex-wrap:wrap;padding-bottom:8px}
+.preset-chips button{padding:4px 12px;border:1px solid var(--line);border-radius:999px;color:var(--muted);font-size:12px;white-space:nowrap}
+.preset-chips button:hover:not(:disabled){color:var(--accent);border-color:var(--accent)}
+.composer-box{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:8px;padding:8px 8px 8px 14px;border:1px solid var(--line);border-radius:14px;background:var(--bg);box-shadow:0 1px 3px #00000014,0 4px 14px #0000000d}
+.composer-box:focus-within{border-color:var(--accent)}
+.composer-box textarea{width:100%;min-height:40px;max-height:140px;resize:none;padding:6px 0;border:0;background:transparent;color:var(--fg);line-height:1.5;font-size:14px}
+.composer-box textarea:focus{outline:none}
+.composer-actions{display:flex;gap:6px;align-items:center}
+#sendQuestion{width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;background:var(--accent);color:var(--bg)}
+#sendQuestion:hover:not(:disabled){filter:brightness(1.08)}
+#sendQuestion:disabled{opacity:.45}
+#sendQuestion svg{width:16px;height:16px}
+#stopAnswer{min-height:32px;padding:5px 12px;border:1px solid var(--line);border-radius:999px;color:var(--muted);font-size:12.5px}
+#stopAnswer:hover{color:var(--danger);border-color:var(--danger)}
+
+/* ===== 窄屏（<620px）：侧栏收进「历史话题」折叠条 ===== */
+@media(max-width:620px){
+  .translation-view{padding-left:18px;padding-right:18px}
+  .assistant-view{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr)}
+  .topic-sidebar{display:none}
+  .mobile-history{display:block;border-bottom:1px solid var(--line);padding:7px 12px}
+  .mobile-history summary{cursor:pointer;font-size:13px;font-weight:600}
+  .mobile-topic-list{max-height:150px;overflow:auto;margin-top:6px}
+  .assistant-main{grid-row:2}
+  .conversation-context{padding:8px 12px}
+  .conversation{padding:14px 16px 20px}
+  .assistant-composer{padding:8px 12px 12px}
+  .assistant-empty{padding:20px 14px}
+  .assistant-error{width:calc(100% - 24px)}
+}
+
+/* ===== 强制色彩（高对比主题） ===== */
+@media(forced-colors:active){
+  :root{--bg:Canvas;--fg:CanvasText;--muted:GrayText;--line:CanvasText;--code:Canvas;--quote:CanvasText;--accent:Highlight;--marker:CanvasText;--accent-soft:Highlight;--danger:CanvasText;--danger-bg:Canvas}
+  .table-scroll,th,td,blockquote,.selection-card,.composer-box,.model-badge{forced-color-adjust:auto}
+  .selection-toolbar{box-shadow:none}
+  .topic-item.active,.preset-chips button:hover:not(:disabled),.message.assistant::before,.topic-item.active .topic-page{color:HighlightText}
+  .message.user{color:HighlightText}
+  #sendQuestion{background:Highlight;color:HighlightText}
+}

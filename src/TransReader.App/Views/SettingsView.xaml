@@ -1,0 +1,462 @@
+<UserControl
+    x:Class="TransReader.App.Views.SettingsView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:views="using:TransReader.App.Views"
+    mc:Ignorable="d">
+
+    <UserControl.Resources>
+        <Style x:Key="CardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
+            <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="16" />
+        </Style>
+        <Style x:Key="CardTitleStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style x:Key="CaptionStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+        </Style>
+        <SolidColorBrush x:Key="StatusNeutralBrush" Color="{ThemeResource TextFillColorSecondary}" />
+        <SolidColorBrush x:Key="StatusSuccessBrush" Color="{ThemeResource SystemFillColorSuccess}" />
+        <SolidColorBrush x:Key="StatusCautionBrush" Color="{ThemeResource SystemFillColorCaution}" />
+    </UserControl.Resources>
+
+    <Grid Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="48" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- 标题栏 -->
+        <Grid Padding="16,0,8,0"
+              BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+              BorderThickness="0,0,0,1">
+            <TextBlock Text="AI 中心"
+                       FontSize="14"
+                       FontWeight="SemiBold"
+                       VerticalAlignment="Center" />
+            <Button HorizontalAlignment="Right"
+                    VerticalAlignment="Center"
+                    Padding="10,6"
+                    Click="BackButton_Click"
+                    ToolTipService.ToolTip="返回阅读器">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <FontIcon Glyph="&#xE72B;" FontSize="12" />
+                    <TextBlock Text="返回" />
+                </StackPanel>
+            </Button>
+        </Grid>
+
+        <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="24" Spacing="16">
+
+                <!-- ============ 总览 ============ -->
+                <TextBlock Text="概览" FontSize="14" FontWeight="SemiBold" />
+                    <StackPanel Spacing="12">
+                        <InfoBar x:Name="OverviewInfoBar" IsClosable="True" IsOpen="False" />
+
+                        <Border Style="{StaticResource CardStyle}">
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="当前模式" Style="{StaticResource CardTitleStyle}" />
+                                <ToggleSwitch x:Name="ModeToggle"
+                                              IsOn="True"
+                                              OnContent="在线翻译"
+                                              OffContent="本地 Qwen3"
+                                              Toggled="ModeToggle_Toggled" />
+                                <TextBlock Style="{StaticResource CaptionStyle}"
+                                           Text="关闭时使用本地 Qwen3 1.7B 离线翻译；开启时调用「在线 API」页配置的接口。" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource CardStyle}">
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="活动模型" Style="{StaticResource CardTitleStyle}" />
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="在线（当前活动端点）" Style="{StaticResource CaptionStyle}" />
+                                    <TextBlock x:Name="OverviewOnlineModelName" Text="—" FontWeight="SemiBold" />
+                                    <TextBlock x:Name="OverviewOnlineModelMeta" Style="{StaticResource CaptionStyle}" />
+                                </StackPanel>
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="本地" Style="{StaticResource CaptionStyle}" />
+                                    <TextBlock x:Name="OverviewLocalModelText" Style="{StaticResource CaptionStyle}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource CardStyle}">
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="用量" Style="{StaticResource CardTitleStyle}" />
+                                <TextBlock x:Name="OverviewUsageText" Style="{StaticResource CaptionStyle}" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                
+
+                <!-- ============ 在线 API ============ -->
+                <TextBlock x:Name="SectionOnline" Text="在线 API" FontSize="14" FontWeight="SemiBold" />
+                    <StackPanel Spacing="12">
+                        <InfoBar x:Name="OnlineInfoBar" IsClosable="True" IsOpen="False" />
+                        <TextBlock Style="{StaticResource CaptionStyle}"
+                                   Text="OpenAI 兼容接口；Key 保存到 Windows 凭据库，不写入配置文件。" />
+
+                        <Border Style="{StaticResource CardStyle}">
+                            <StackPanel Spacing="12">
+                                <Grid>
+                                    <StackPanel VerticalAlignment="Center" Spacing="2">
+                                        <TextBlock x:Name="ProviderCountText"
+                                                   Style="{StaticResource CardTitleStyle}"
+                                                   Text="端点" />
+                                        <TextBlock x:Name="ProviderSummaryText" Style="{StaticResource CaptionStyle}" />
+                                    </StackPanel>
+                                    <Button HorizontalAlignment="Right"
+                                            VerticalAlignment="Center"
+                                            Click="AddCustomProvider_Click"
+                                            Style="{ThemeResource AccentButtonStyle}">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <FontIcon Glyph="&#xE710;" FontSize="12" />
+                                            <TextBlock Text="添加端点" />
+                                        </StackPanel>
+                                    </Button>
+                                </Grid>
+                                <ListView x:Name="ProviderList"
+                                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                          ScrollViewer.HorizontalScrollMode="Disabled"
+                                          SelectionMode="None">
+                                    <ListView.ItemContainerStyle>
+                                        <Style TargetType="ListViewItem">
+                                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                            <Setter Property="Padding" Value="0" />
+                                            <Setter Property="Margin" Value="0" />
+                                        </Style>
+                                    </ListView.ItemContainerStyle>
+                                    <ListView.ItemTemplate>
+                                        <DataTemplate x:DataType="views:ProviderRowItem">
+                                            <Border Padding="14,10"
+                                                    Margin="0,0,0,8"
+                                                    HorizontalAlignment="Stretch"
+                                                    Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="8">
+                                                <StackPanel Spacing="3">
+                                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                                        <Border Width="10"
+                                                                Height="10"
+                                                                VerticalAlignment="Center"
+                                                                Background="{x:Bind StatusBrush}"
+                                                                CornerRadius="5"
+                                                                ToolTipService.ToolTip="{x:Bind StatusText}" />
+                                                        <TextBlock VerticalAlignment="Center"
+                                                                   FontWeight="SemiBold"
+                                                                   Text="{x:Bind DisplayName}" />
+                                                        <Border Padding="6,1"
+                                                                VerticalAlignment="Center"
+                                                                Background="{ThemeResource AccentFillColorTertiaryBrush}"
+                                                                CornerRadius="4"
+                                                                Visibility="{x:Bind IsActive}">
+                                                            <TextBlock FontSize="11"
+                                                                       Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                                                       Text="活动" />
+                                                        </Border>
+                                                        <Border Padding="6,1"
+                                                                VerticalAlignment="Center"
+                                                                Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                                                CornerRadius="4"
+                                                                Visibility="{x:Bind IsCustom}">
+                                                            <TextBlock FontSize="11"
+                                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                                       Text="自定义" />
+                                                        </Border>
+                                                    </StackPanel>
+                                                    <TextBlock FontSize="12"
+                                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                               Text="{x:Bind EndpointText}"
+                                                               TextTrimming="CharacterEllipsis" />
+                                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                                        <TextBlock FontSize="12"
+                                                                   Foreground="{x:Bind StatusBrush}"
+                                                                   Text="{x:Bind StatusText}" />
+                                                        <TextBlock FontSize="12"
+                                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                                   Text="{x:Bind UsageText}"
+                                                                   Visibility="{x:Bind HasUsage}" />
+                                                        <StackPanel Orientation="Horizontal"
+                                                                    Spacing="4"
+                                                                    Visibility="{x:Bind HasTestResult}">
+                                                            <FontIcon FontSize="12"
+                                                                      Foreground="{x:Bind TestResultBrush}"
+                                                                      Glyph="{x:Bind TestResultGlyph}" />
+                                                            <TextBlock FontSize="12"
+                                                                       Text="{x:Bind TestResultText}"
+                                                                       ToolTipService.ToolTip="{x:Bind TestResultMessage}" />
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                    <StackPanel Margin="0,4,0,0"
+                                                                Orientation="Horizontal"
+                                                                Spacing="6">
+                                                        <Button Content="设为活动"
+                                                                IsEnabled="{x:Bind IsNotActive}"
+                                                                Style="{ThemeResource AccentButtonStyle}"
+                                                                Tag="{x:Bind Id}"
+                                                                Click="ProviderSetActive_Click" />
+                                                        <Button Content="编辑"
+                                                                Tag="{x:Bind Id}"
+                                                                Click="ProviderEdit_Click" />
+                                                        <Button Content="测试"
+                                                                Tag="{x:Bind Id}"
+                                                                Click="ProviderTest_Click" />
+                                                        <Button Content="删除"
+                                                                Tag="{x:Bind Id}"
+                                                                Click="ProviderDelete_Click"
+                                                                Visibility="{x:Bind IsCustom}" />
+                                                    </StackPanel>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ListView.ItemTemplate>
+                                </ListView>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- 编辑面板：默认收起，点「添加端点」或卡片「编辑」时展开 -->
+                        <Border x:Name="ProviderFormCard"
+                                Style="{StaticResource CardStyle}"
+                                Visibility="Collapsed">
+                            <StackPanel Spacing="12">
+                                <TextBlock x:Name="FormTitleText"
+                                           Style="{StaticResource CardTitleStyle}"
+                                           Text="编辑端点" />
+                                <StackPanel x:Name="DisplayNameField" Spacing="4" Visibility="Collapsed">
+                                    <TextBlock Text="显示名称" Style="{StaticResource CaptionStyle}" />
+                                    <TextBox x:Name="DisplayNameBox"
+                                             MinWidth="280"
+                                             HorizontalAlignment="Left"
+                                             PlaceholderText="例如：公司内网网关" />
+                                </StackPanel>
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="API 地址（BaseUrl）" Style="{StaticResource CaptionStyle}" />
+                                    <TextBox x:Name="BaseUrlBox"
+                                             MinWidth="420"
+                                             HorizontalAlignment="Left"
+                                             PlaceholderText="https://api.example.com/v1" />
+                                </StackPanel>
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="模型名称" Style="{StaticResource CaptionStyle}" />
+                                    <TextBox x:Name="ModelBox"
+                                             MinWidth="420"
+                                             HorizontalAlignment="Left" />
+                                </StackPanel>
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="API Key" Style="{StaticResource CaptionStyle}" />
+                                    <PasswordBox x:Name="ApiKeyBox"
+                                                 MinWidth="420"
+                                                 HorizontalAlignment="Left" />
+                                </StackPanel>
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="鉴权方式" Style="{StaticResource CaptionStyle}" />
+                                    <ComboBox x:Name="AuthModeBox"
+                                              MinWidth="280"
+                                              HorizontalAlignment="Left"
+                                              SelectedIndex="0">
+                                        <ComboBoxItem Content="api-key 请求头" Tag="api-key" />
+                                        <ComboBoxItem Content="Authorization: Bearer" Tag="bearer" />
+                                        <ComboBoxItem Content="无鉴权（none）" Tag="none" />
+                                    </ComboBox>
+                                </StackPanel>
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="目标语言" Style="{StaticResource CaptionStyle}" />
+                                    <ComboBox x:Name="ProviderLanguageBox"
+                                              MinWidth="280"
+                                              HorizontalAlignment="Left"
+                                              SelectedIndex="0">
+                                        <ComboBoxItem Content="简体中文" />
+                                        <ComboBoxItem Content="繁体中文" />
+                                        <ComboBoxItem Content="英语" />
+                                        <ComboBoxItem Content="日语" />
+                                    </ComboBox>
+                                </StackPanel>
+                                <ToggleSwitch x:Name="MultimodalToggle"
+                                              Header="多模态（图文）"
+                                              OffContent="不支持"
+                                              OnContent="支持" />
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="温度（0 ~ 2；预设模型为固定值，仅自定义端点可编辑）"
+                                               Style="{StaticResource CaptionStyle}" />
+                                    <NumberBox x:Name="TemperatureBox"
+                                               Width="180"
+                                               HorizontalAlignment="Left"
+                                               Maximum="2"
+                                               Minimum="0"
+                                               SmallChange="0.1"
+                                               SpinButtonPlacementMode="Inline"
+                                               Value="0.1" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Click="ProviderSave_Click"
+                                            Content="保存"
+                                            Style="{ThemeResource AccentButtonStyle}" />
+                                    <Button x:Name="ProviderFormTestButton"
+                                            Click="ProviderFormTest_Click"
+                                            Content="测试连接" />
+                                    <Button Click="ProviderFormCancel_Click"
+                                            Content="取消" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                
+
+                <!-- ============ 本地 AI ============ -->
+                <TextBlock x:Name="SectionLocal" Text="本地 AI" FontSize="14" FontWeight="SemiBold" />
+                    <StackPanel Spacing="12">
+                        <InfoBar x:Name="LocalInfoBar" IsClosable="True" IsOpen="False" />
+
+                        <Border Style="{StaticResource CardStyle}">
+                            <StackPanel Spacing="8">
+                                <TextBlock x:Name="LocalModelNameText" Style="{StaticResource CardTitleStyle}" />
+                                <TextBlock x:Name="LocalStatusText" Style="{StaticResource CaptionStyle}" />
+                                <ProgressBar x:Name="LocalInstallProgress"
+                                             Maximum="1"
+                                             Visibility="Collapsed" />
+                                <TextBlock x:Name="LocalInstalledSizeText" Style="{StaticResource CaptionStyle}" />
+                                <StackPanel Margin="0,4,0,0"
+                                            Orientation="Horizontal"
+                                            Spacing="8">
+                                    <Button x:Name="LocalInstallButton"
+                                            Click="LocalInstall_Click"
+                                            Content="安装 / 修复"
+                                            Style="{ThemeResource AccentButtonStyle}" />
+                                    <Button x:Name="LocalVerifyButton"
+                                            Click="LocalVerify_Click"
+                                            Content="校验" />
+                                    <Button x:Name="LocalUninstallButton"
+                                            Click="LocalUninstall_Click"
+                                            Content="卸载" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock Style="{StaticResource CaptionStyle}"
+                                   Text="模型与运行时合计约 1.3 GB，下载源在 HuggingFace 与 hf-mirror 之间自动切换；运行时按可用内存自动调节上下文长度（约需 2.2 GB 可提交内存），切回在线模式或闲置 10 分钟后自动卸载释放内存。" />
+                    </StackPanel>
+                
+
+                <!-- ============ AI 能力 ============ -->
+                <TextBlock x:Name="SectionCapabilities" Text="AI 能力" FontSize="14" FontWeight="SemiBold" />
+                    <StackPanel Spacing="12">
+                        <InfoBar x:Name="CapabilitiesInfoBar" IsClosable="True" IsOpen="False" />
+
+                        <Border Style="{StaticResource CardStyle}">
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="翻译" Style="{StaticResource CardTitleStyle}" />
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="目标语言（保存到当前活动模型）" Style="{StaticResource CaptionStyle}" />
+                                    <ComboBox x:Name="CapabilityLanguageBox"
+                                              MinWidth="280"
+                                              HorizontalAlignment="Left"
+                                              SelectionChanged="CapabilityLanguageBox_SelectionChanged">
+                                        <ComboBoxItem Content="简体中文" />
+                                        <ComboBoxItem Content="繁体中文" />
+                                        <ComboBoxItem Content="英语" />
+                                        <ComboBoxItem Content="日语" />
+                                    </ComboBox>
+                                </StackPanel>
+                                <CheckBox x:Name="PrefetchBox"
+                                          Checked="PrefetchBox_Changed"
+                                          Content="空闲时预翻译下一页"
+                                          Unchecked="PrefetchBox_Changed" />
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="翻译类型（按学科领域定向语言与格式；“自动”跟随 AI 文献分析）" Style="{StaticResource CaptionStyle}" />
+                                    <ComboBox x:Name="DomainPreferenceBox"
+                                              MinWidth="280"
+                                              HorizontalAlignment="Left"
+                                              SelectionChanged="DomainPreferenceBox_SelectionChanged" />
+                                </StackPanel>
+                                <CheckBox x:Name="LocalFallbackBox"
+                                          Checked="LocalFallbackBox_Changed"
+                                          Content="在线翻译失败时自动改用本地模型兜底"
+                                          Unchecked="LocalFallbackBox_Changed" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource CardStyle}">
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="领域提示词" Style="{StaticResource CardTitleStyle}" />
+                                <TextBlock Style="{StaticResource CaptionStyle}"
+                                           Text="按学科领域定制翻译时追加的提示词；清空并保存即恢复内置默认。修改后相关页面会按新提示词自动重译。" />
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <ComboBox x:Name="DomainHintPickerBox"
+                                              MinWidth="200"
+                                              HorizontalAlignment="Left"
+                                              SelectionChanged="DomainHintPickerBox_SelectionChanged" />
+                                    <TextBlock x:Name="DomainHintStateText"
+                                               VerticalAlignment="Center"
+                                               Style="{StaticResource CaptionStyle}" />
+                                </StackPanel>
+                                <TextBox x:Name="DomainHintTextBox"
+                                         AcceptsReturn="True"
+                                         MaxHeight="160"
+                                         MinHeight="68"
+                                         TextWrapping="Wrap" />
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Click="DomainHintSave_Click"
+                                            Content="保存"
+                                            Style="{ThemeResource AccentButtonStyle}" />
+                                    <Button Click="DomainHintReset_Click"
+                                            Content="恢复默认" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource CardStyle}">
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="问答" Style="{StaticResource CardTitleStyle}" />
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="问答使用的模型来源" Style="{StaticResource CaptionStyle}" />
+                                    <ComboBox x:Name="AssistantSourceBox"
+                                              MinWidth="280"
+                                              HorizontalAlignment="Left"
+                                              SelectionChanged="AssistantSourceBox_SelectionChanged" />
+                                </StackPanel>
+                                <Button HorizontalAlignment="Left"
+                                        Click="ClearAssistantHistory_Click"
+                                        Content="清空问答历史" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource CardStyle}">
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="文献库整理" Style="{StaticResource CardTitleStyle}" />
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="整理使用的模型来源（本地离线或在线 API）" Style="{StaticResource CaptionStyle}" />
+                                    <ComboBox x:Name="LibraryAnalysisSourceBox"
+                                              MinWidth="280"
+                                              HorizontalAlignment="Left"
+                                              SelectionChanged="LibraryAnalysisSourceBox_SelectionChanged" />
+                                </StackPanel>
+                                <ToggleSwitch x:Name="AutoAnalysisToggle"
+                                              IsOn="True"
+                                              OffContent="不自动分析新文献"
+                                              OnContent="自动分析新导入的文献"
+                                              Toggled="AutoAnalysisToggle_Toggled" />
+                                <TextBlock x:Name="PendingAnalysisText" Style="{StaticResource CaptionStyle}" />
+                                <HyperlinkButton x:Name="InstallLocalModelLink"
+                                                 HorizontalAlignment="Left"
+                                                 Click="InstallLocalModelLink_Click"
+                                                 Content="安装本地模型后自动开始" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                
+                </StackPanel>
+</ScrollViewer>
+    </Grid>
+</UserControl>

@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'none'">
+  <link rel="stylesheet" href="vendor/katex.min.css">
+  <link rel="stylesheet" href="reader.css">
+</head>
+<body>
+  <section id="translationView" class="translation-view">
+    <main id="content" aria-live="polite"></main>
+    <div id="selectionToolbar" class="selection-toolbar" hidden>
+      <button id="explainButton" type="button">解释</button>
+      <button id="askButton" type="button">提问</button>
+    </div>
+  </section>
+  <section id="assistantView" class="assistant-view" aria-label="AI 阅读助手" hidden>
+    <details id="mobileHistory" class="mobile-history">
+      <summary>历史话题</summary>
+      <div id="mobileTopicList" class="mobile-topic-list"></div>
+    </details>
+    <nav class="topic-sidebar" aria-label="历史话题">
+      <div class="topic-sidebar-heading">历史话题</div>
+      <div id="topicList" class="topic-list"></div>
+    </nav>
+    <section class="assistant-main">
+      <header class="conversation-context">
+        <div class="assistant-context-bar">
+          <div id="assistantPage" class="assistant-page">当前页面</div>
+          <span id="assistantModelBadge" class="model-badge">—</span>
+        </div>
+        <details id="selectionCard" class="selection-card" open>
+          <summary>原文选区</summary>
+          <blockquote id="selectionQuote"></blockquote>
+        </details>
+      </header>
+      <div id="conversation" class="conversation" aria-live="polite"></div>
+      <div id="assistantEmpty" class="assistant-empty">
+        <div class="empty-panel">
+          <div class="empty-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="46" height="46" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+              <path d="M4 3.5h16A1.5 1.5 0 0 1 21.5 5v11a1.5 1.5 0 0 1-1.5 1.5h-8l-5 4v-4H4A1.5 1.5 0 0 1 2.5 16V5A1.5 1.5 0 0 1 4 3.5z"/>
+              <path d="M12 7.4l.95 2.3 2.3.95-2.3.95-.95 2.3-.95-2.3-2.3-.95 2.3-.95z"/>
+            </svg>
+          </div>
+          <div class="empty-title">阅读助手</div>
+          <p class="empty-intro">选中译文中的任意文字，点浮条上的「解释」或「提问」，助手会结合本页内容与全书上下文回答，并支持连续追问。</p>
+        </div>
+      </div>
+      <div id="assistantError" class="assistant-error" role="status" aria-live="assertive" hidden></div>
+      <footer class="assistant-composer">
+        <div id="presetChips" class="preset-chips" role="group" aria-label="快捷问题" hidden>
+          <button type="button">总结要点</button>
+          <button type="button">通俗解释</button>
+          <button type="button">术语清单</button>
+          <button type="button">和上下文的关系</button>
+        </div>
+        <div class="composer-box">
+          <textarea id="questionInput" rows="2" maxlength="4000" placeholder="围绕这段内容继续提问…" aria-label="继续提问"></textarea>
+          <div class="composer-actions">
+            <button id="stopAnswer" type="button" hidden>停止</button>
+            <button id="sendQuestion" class="primary" type="button" aria-label="发送" title="发送">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                <path d="M12 19V5M5 12l7-7 7 7"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </footer>
+    </section>
+  </section>
+  <script src="vendor/markdown-it.min.js"></script>
+  <script src="vendor/katex.min.js"></script>
+  <script src="vendor/auto-render.min.js"></script>
+  <script src="reader.js"></script>
+</body>
+</html>

@@ -1,0 +1,71 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <RootNamespace>TransReader.App</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Platforms>x64</Platforms>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
+    <UseWinUI>true</UseWinUI>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <PublishSingleFile>false</PublishSingleFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.WinUI.Controls.Sizers" Version="8.2.251219" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260710003" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.8249" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Assets\Icons\*.svg">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\AppIcon.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\AppIcon-*.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\Reader\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TransReader.Core\TransReader.Core.csproj" />
+  </ItemGroup>
+
+  <!--
+    原生 OCR 工件缺失时早失败：全新克隆若未先跑 scripts\build.ps1，artifacts\native 为空，
+    Content 的 Condition="Exists(...)" 会静默省略 OCR，产出的 exe 运行时才发现 OCR 不可用。
+    此 Target 在 unpackaged 构建前显式报错；CI/纯托管 lint 可用 -p:SkipNativeCheck=true 跳过。
+  -->
+  <Target Name="EnsureNativeArtifacts" BeforeTargets="Build"
+          Condition="'$(WindowsPackageType)' == 'None' and '$(SkipNativeCheck)' != 'true' and '$(DesignTimeBuild)' != 'true'">
+    <Error Condition="!Exists('..\..\artifacts\native\TransOcrNative.Host.exe')"
+           Text="TransOcrNative.Host.exe 不在 artifacts\native 下。请先运行 scripts\build.ps1 重建原生 OCR（或传 -p:SkipNativeCheck=true 跳过此检查，但产出的 exe 将无 OCR 能力）。" />
+  </Target>
+
+  <ItemGroup>
+    <Content Include="..\..\artifacts\native\*.dll" Condition="Exists('..\..\artifacts\native\TransOcrNative.dll')">
+      <Link>%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\artifacts\native\TransOcrNative.Host.exe" Condition="Exists('..\..\artifacts\native\TransOcrNative.Host.exe')">
+      <Link>%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\models\PP-OCRv5_mobile_det_infer\**\*" Condition="Exists('..\..\models\PP-OCRv5_mobile_det_infer')">
+      <Link>models\PP-OCRv5_mobile_det_infer\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\models\PP-OCRv5_mobile_rec_infer\**\*" Condition="Exists('..\..\models\PP-OCRv5_mobile_rec_infer')">
+      <Link>models\PP-OCRv5_mobile_rec_infer\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+</Project>

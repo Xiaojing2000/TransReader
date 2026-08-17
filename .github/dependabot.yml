@@ -1,0 +1,20 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ["*"]
+
+  - package-ecosystem: nuget
+    directories:
+      - /src/TransReader.App
+      - /src/TransReader.Core
+      - /tests/TransReader.Core.Tests
+    schedule:
+      interval: weekly
+    groups:
+      nuget:
+        patterns: ["*"]

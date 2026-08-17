@@ -1,0 +1,22 @@
+name: Feature request / 功能建议
+description: Suggest an idea for TransReader / 为译页提出建议
+title: "[Feature] "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: scenario
+    attributes:
+      label: Reading scenario / 阅读场景
+      description: What are you trying to read or accomplish?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed experience / 期望体验
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives / 替代方案

@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="390" viewBox="0 0 1200 390" role="img" aria-labelledby="title desc">
+  <title id="title">TransReader feature overview</title>
+  <desc id="desc">Six colorful cards describing compare, recognize, translate, ask, organize, and local-first features.</desc>
+  <style>
+    .card { stroke-width: 2; }
+    .number { font: 700 18px 'Segoe UI', Arial, sans-serif; opacity: .68; }
+    .heading { font: 700 27px 'Segoe UI', Arial, sans-serif; fill: #172033; }
+    .body { font: 400 16px 'Segoe UI', Arial, sans-serif; fill: #455069; }
+  </style>
+  <rect class="card" x="15" y="15" width="370" height="165" rx="24" fill="#E7F0FF" stroke="#82AFFF"/>
+  <text class="number" x="42" y="52" fill="#3468D4">01</text>
+  <text class="heading" x="42" y="92">Compare</text>
+  <text class="body" x="42" y="124">Read the source and translation</text>
+  <text class="body" x="42" y="148">side by side, page by page.</text>
+
+  <rect class="card" x="415" y="15" width="370" height="165" rx="24" fill="#E5FAF1" stroke="#61CBA1"/>
+  <text class="number" x="442" y="52" fill="#16865F">02</text>
+  <text class="heading" x="442" y="92">Recognize</text>
+  <text class="body" x="442" y="124">Built-in PP-OCR turns scanned</text>
+  <text class="body" x="442" y="148">papers into selectable text.</text>
+
+  <rect class="card" x="815" y="15" width="370" height="165" rx="24" fill="#FFF1DC" stroke="#F2AE4E"/>
+  <text class="number" x="842" y="52" fill="#BD6B00">03</text>
+  <text class="heading" x="842" y="92">Translate</text>
+  <text class="body" x="842" y="124">Use an online API or a local</text>
+  <text class="body" x="842" y="148">Qwen model—your choice.</text>
+
+  <rect class="card" x="15" y="210" width="370" height="165" rx="24" fill="#F2EAFE" stroke="#A98BE8"/>
+  <text class="number" x="42" y="247" fill="#7351B8">04</text>
+  <text class="heading" x="42" y="287">Ask</text>
+  <text class="body" x="42" y="319">Chat with the current page and</text>
+  <text class="body" x="42" y="343">unpack difficult passages.</text>
+
+  <rect class="card" x="415" y="210" width="370" height="165" rx="24" fill="#FFE8EF" stroke="#EB83A7"/>
+  <text class="number" x="442" y="247" fill="#B43F6A">05</text>
+  <text class="heading" x="442" y="287">Organize</text>
+  <text class="body" x="442" y="319">Keep papers, reading progress,</text>
+  <text class="body" x="442" y="343">and results in one library.</text>
+
+  <rect class="card" x="815" y="210" width="370" height="165" rx="24" fill="#E6F7FA" stroke="#62BCCE"/>
+  <text class="number" x="842" y="247" fill="#267F91">06</text>
+  <text class="heading" x="842" y="287">Stay local</text>
+  <text class="body" x="842" y="319">Offline OCR and local AI keep</text>
+  <text class="body" x="842" y="343">sensitive documents on-device.</text>
+</svg>

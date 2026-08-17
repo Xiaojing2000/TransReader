@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="390" viewBox="0 0 1200 390" role="img" aria-labelledby="title desc">
+  <title id="title">TransReader 功能概览</title>
+  <desc id="desc">六张彩色卡片，介绍对照、识别、翻译、提问、整理和本地优先功能。</desc>
+  <style>
+    .card { stroke-width: 2; }
+    .number { font: 700 18px 'Segoe UI', Arial, sans-serif; opacity: .68; }
+    .heading { font: 700 27px 'Microsoft YaHei', 'Segoe UI', sans-serif; fill: #172033; }
+    .body { font: 400 16px 'Microsoft YaHei', 'Segoe UI', sans-serif; fill: #455069; }
+  </style>
+  <rect class="card" x="15" y="15" width="370" height="165" rx="24" fill="#E7F0FF" stroke="#82AFFF"/>
+  <text class="number" x="42" y="52" fill="#3468D4">01</text>
+  <text class="heading" x="42" y="92">对照</text>
+  <text class="body" x="42" y="124">原文与译文并排呈现，逐页阅读，</text>
+  <text class="body" x="42" y="148">不必在窗口之间来回切换。</text>
+
+  <rect class="card" x="415" y="15" width="370" height="165" rx="24" fill="#E5FAF1" stroke="#61CBA1"/>
+  <text class="number" x="442" y="52" fill="#16865F">02</text>
+  <text class="heading" x="442" y="92">识别</text>
+  <text class="body" x="442" y="124">内置 PP-OCR，把扫描论文和图片</text>
+  <text class="body" x="442" y="148">转换成可复制、可翻译的文字。</text>
+
+  <rect class="card" x="815" y="15" width="370" height="165" rx="24" fill="#FFF1DC" stroke="#F2AE4E"/>
+  <text class="number" x="842" y="52" fill="#BD6B00">03</text>
+  <text class="heading" x="842" y="92">翻译</text>
+  <text class="body" x="842" y="124">在线 API 或本地 Qwen 模型均可，</text>
+  <text class="body" x="842" y="148">速度、隐私与成本由你决定。</text>
+
+  <rect class="card" x="15" y="210" width="370" height="165" rx="24" fill="#F2EAFE" stroke="#A98BE8"/>
+  <text class="number" x="42" y="247" fill="#7351B8">04</text>
+  <text class="heading" x="42" y="287">提问</text>
+  <text class="body" x="42" y="319">针对当前页面追问概念、方法与结论，</text>
+  <text class="body" x="42" y="343">让难懂段落真正读明白。</text>
+
+  <rect class="card" x="415" y="210" width="370" height="165" rx="24" fill="#FFE8EF" stroke="#EB83A7"/>
+  <text class="number" x="442" y="247" fill="#B43F6A">05</text>
+  <text class="heading" x="442" y="287">整理</text>
+  <text class="body" x="442" y="319">论文、阅读进度与处理结果集中管理，</text>
+  <text class="body" x="442" y="343">下一次打开就从上次继续。</text>
+
+  <rect class="card" x="815" y="210" width="370" height="165" rx="24" fill="#E6F7FA" stroke="#62BCCE"/>
+  <text class="number" x="842" y="247" fill="#267F91">06</text>
+  <text class="heading" x="842" y="287">留在本地</text>
+  <text class="body" x="842" y="319">离线 OCR 与本地 AI 模式，让敏感</text>
+  <text class="body" x="842" y="343">文档尽量不离开你的电脑。</text>
+</svg>

@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Build and test
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: "**/*.csproj"
+
+      - name: Restore
+        run: dotnet restore TransReader.slnx
+
+      - name: Build managed application
+        run: dotnet build src/TransReader.App/TransReader.App.csproj -c Release -p:Platform=x64 -p:SkipNativeCheck=true --no-restore --nologo
+
+      - name: Run tests
+        run: dotnet test tests/TransReader.Core.Tests/TransReader.Core.Tests.csproj -c Release --no-restore --nologo
+
+      - name: Audit NuGet packages
+        run: dotnet list TransReader.slnx package --vulnerable --include-transitive

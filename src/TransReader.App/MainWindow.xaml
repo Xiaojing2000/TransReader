@@ -1,0 +1,807 @@
+<Window
+    x:Class="TransReader.App.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:controls="using:CommunityToolkit.WinUI.Controls"
+    xmlns:local="using:TransReader.App"
+    mc:Ignorable="d"
+    Title="译页 TransReader">
+
+    <Grid x:Name="RootGrid"
+          AllowDrop="True"
+          KeyboardAcceleratorPlacementMode="Hidden"
+          DragOver="RootGrid_DragOver"
+          Drop="RootGrid_Drop"
+          SizeChanged="RootGrid_SizeChanged">
+        <Grid.Resources>
+            <local:BoolToBrushConverter x:Key="ThumbnailBorderConverter" />
+        </Grid.Resources>
+        <Grid.KeyboardAccelerators>
+            <KeyboardAccelerator Key="Left" Invoked="PreviousPageAccelerator_Invoked" />
+            <KeyboardAccelerator Key="PageUp" Invoked="PreviousPageAccelerator_Invoked" />
+            <KeyboardAccelerator Key="Right" Invoked="NextPageAccelerator_Invoked" />
+            <KeyboardAccelerator Key="PageDown" Invoked="NextPageAccelerator_Invoked" />
+            <KeyboardAccelerator Key="Home" Invoked="FirstPageAccelerator_Invoked" />
+            <KeyboardAccelerator Key="End" Invoked="LastPageAccelerator_Invoked" />
+            <KeyboardAccelerator Key="O" Modifiers="Control" Invoked="OpenAccelerator_Invoked" />
+            <KeyboardAccelerator Key="R" Modifiers="Control" Invoked="RetryAccelerator_Invoked" />
+        </Grid.KeyboardAccelerators>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Custom title bar (drag region) -->
+        <Grid x:Name="AppTitleBar"
+              Height="48"
+              Padding="12,0,0,0"
+              BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+              BorderThickness="0,0,0,1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Image Width="30" Height="30"
+                   VerticalAlignment="Center"
+                   Stretch="Uniform"
+                   UseLayoutRounding="True"
+                   Source="ms-appx:///Assets/AppIcon-128.png" />
+
+            <StackPanel Grid.Column="1"
+                        Margin="10,0,12,0"
+                        VerticalAlignment="Center"
+                        Orientation="Horizontal"
+                        Spacing="8">
+                <TextBlock Text="译页" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
+                <TextBlock x:Name="DocumentNameText"
+                           Text="PDF 对照翻译阅读器"
+                           Style="{ThemeResource TransReaderCaptionStyle}"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+
+        </Grid>
+
+        <!-- Commands live below the draggable title region so they can never
+             collide with Windows caption buttons. -->
+        <Border Grid.Row="1"
+                Height="44"
+                Padding="12,4"
+                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                BorderThickness="0,0,0,1">
+            <Grid>
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                <ToggleButton x:Name="ThumbnailToggle"
+                              Width="36" Height="32"
+                              Padding="0"
+                              CornerRadius="4"
+                              VerticalAlignment="Center"
+                              IsChecked="True"
+                              IsEnabled="False"
+                              ToolTipService.ToolTip="显示/隐藏页面缩略图"
+                              AutomationProperties.Name="显示或隐藏页面缩略图"
+                              Checked="ThumbnailToggle_Toggled"
+                              Unchecked="ThumbnailToggle_Toggled">
+                    <ToggleButton.Resources>
+                        <!-- Reuse the same Fluent subtle-button state brushes as
+                             the icon commands to the right. The stock ToggleButton
+                             template keeps its pointer/pressed transitions. -->
+                        <StaticResource x:Key="ToggleButtonBackground" ResourceKey="SubtleFillColorTransparentBrush" />
+                        <StaticResource x:Key="ToggleButtonBackgroundPointerOver" ResourceKey="SubtleFillColorSecondaryBrush" />
+                        <StaticResource x:Key="ToggleButtonBackgroundPressed" ResourceKey="SubtleFillColorTertiaryBrush" />
+                        <StaticResource x:Key="ToggleButtonBackgroundChecked" ResourceKey="SubtleFillColorSecondaryBrush" />
+                        <StaticResource x:Key="ToggleButtonBackgroundCheckedPointerOver" ResourceKey="SubtleFillColorSecondaryBrush" />
+                        <StaticResource x:Key="ToggleButtonBackgroundCheckedPressed" ResourceKey="SubtleFillColorTertiaryBrush" />
+                        <StaticResource x:Key="ToggleButtonForeground" ResourceKey="TextFillColorPrimaryBrush" />
+                        <StaticResource x:Key="ToggleButtonForegroundPointerOver" ResourceKey="TextFillColorPrimaryBrush" />
+                        <StaticResource x:Key="ToggleButtonForegroundPressed" ResourceKey="TextFillColorSecondaryBrush" />
+                        <StaticResource x:Key="ToggleButtonForegroundChecked" ResourceKey="TextFillColorPrimaryBrush" />
+                        <StaticResource x:Key="ToggleButtonForegroundCheckedPointerOver" ResourceKey="TextFillColorPrimaryBrush" />
+                        <StaticResource x:Key="ToggleButtonForegroundCheckedPressed" ResourceKey="TextFillColorSecondaryBrush" />
+                        <StaticResource x:Key="ToggleButtonBorderBrush" ResourceKey="ControlStrokeColorDefaultBrush" />
+                        <StaticResource x:Key="ToggleButtonBorderBrushPointerOver" ResourceKey="ControlStrokeColorDefaultBrush" />
+                        <StaticResource x:Key="ToggleButtonBorderBrushPressed" ResourceKey="ControlStrokeColorDefaultBrush" />
+                        <StaticResource x:Key="ToggleButtonBorderBrushChecked" ResourceKey="ControlStrokeColorDefaultBrush" />
+                        <StaticResource x:Key="ToggleButtonBorderBrushCheckedPointerOver" ResourceKey="ControlStrokeColorDefaultBrush" />
+                        <StaticResource x:Key="ToggleButtonBorderBrushCheckedPressed" ResourceKey="ControlStrokeColorDefaultBrush" />
+                    </ToggleButton.Resources>
+                    <FontIcon x:Name="ThumbnailToggleIcon" Glyph="&#xE89F;" FontSize="14" />
+                </ToggleButton>
+                <Border Width="1" Height="20" Margin="2,0,4,0"
+                        VerticalAlignment="Center"
+                        Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                <SplitButton x:Name="OpenSplitButton" Click="OpenSplitButton_Click">
+                    <SplitButton.Flyout>
+                        <MenuFlyout x:Name="RecentFilesFlyout" Opening="RecentFilesFlyout_Opening" />
+                    </SplitButton.Flyout>
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon Glyph="&#xE8E5;" FontSize="14" />
+                        <TextBlock Text="打开" />
+                    </StackPanel>
+                </SplitButton>
+                <Border Width="1" Height="20" Margin="4,0"
+                        VerticalAlignment="Center"
+                        Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                <Button x:Name="PreviousButton"
+                        Style="{ThemeResource SubtleButtonStyle}"
+                        ToolTipService.ToolTip="上一页（← / Page Up）"
+                        Click="PreviousButton_Click"
+                        IsEnabled="False">
+                    <FontIcon Glyph="&#xE76B;" FontSize="14" />
+                </Button>
+                <NumberBox x:Name="PageNumberBox"
+                           Width="72"
+                           Height="32"
+                           Minimum="1"
+                           Value="1"
+                           IsEnabled="False"
+                           SpinButtonPlacementMode="Hidden"
+                           ToolTipService.ToolTip="输入页码跳转"
+                           ValueChanged="PageNumberBox_ValueChanged"
+                           KeyDown="PageNumberBox_KeyDown"
+                           LostFocus="PageNumberBox_LostFocus" />
+                <TextBlock x:Name="PageCountText"
+                           Text="/ —"
+                           VerticalAlignment="Center"
+                           Style="{ThemeResource TransReaderCaptionStyle}" />
+                <Button x:Name="NextButton"
+                        Style="{ThemeResource SubtleButtonStyle}"
+                        ToolTipService.ToolTip="下一页（→ / Page Down）"
+                        Click="NextButton_Click"
+                        IsEnabled="False">
+                    <FontIcon Glyph="&#xE76C;" FontSize="14" />
+                </Button>
+                <Border Width="1" Height="20" Margin="4,0"
+                        VerticalAlignment="Center"
+                        Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                <Button x:Name="RetryTranslationButton"
+                        Style="{ThemeResource SubtleButtonStyle}"
+                        ToolTipService.ToolTip="重新翻译（Ctrl+R）"
+                        Click="RetryTranslationButton_Click"
+                        IsEnabled="False">
+                    <FontIcon Glyph="&#xE72C;" FontSize="14" />
+                </Button>
+                <Button x:Name="FitHeightButton"
+                        Style="{ThemeResource SubtleButtonStyle}"
+                        ToolTipService.ToolTip="适合页面高度"
+                        Click="FitHeightButton_Click"
+                        IsEnabled="False">
+                    <FontIcon Glyph="&#xE799;" FontSize="14" />
+                </Button>
+                <Border Width="1" Height="20" Margin="4,0"
+                        VerticalAlignment="Center"
+                        Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                <!-- ToggleSwitch 的 Header 默认排在开关上方，48px 标题栏里会错位；
+                     改为横向 TextBlock + 无 Header 开关，与相邻命令保持同一基线。 -->
+                <StackPanel Orientation="Horizontal"
+                            VerticalAlignment="Center"
+                            ToolTipService.ToolTip="打开使用在线大模型；关闭后页面不会上传，改用本地 Qwen3。切换只能阻止后续上传，已发出的在线请求可能无法撤回。">
+                    <TextBlock Text="在线翻译"
+                               Margin="0,0,8,0"
+                               FontSize="12"
+                               VerticalAlignment="Center" />
+                    <ToggleSwitch x:Name="OnlineTranslationToggle"
+                                  IsOn="True"
+                                  MinWidth="0"
+                                  OnContent=""
+                                  OffContent=""
+                                  VerticalAlignment="Center"
+                                  Toggled="OnlineTranslationToggle_Toggled" />
+                </StackPanel>
+                <ComboBox x:Name="QuickModelPicker"
+                          Width="120"
+                          VerticalAlignment="Center"
+                          ToolTipService.ToolTip="切换翻译模型（完整配置见翻译设置）"
+                          SelectionChanged="QuickModelPicker_SelectionChanged">
+                    <ComboBoxItem Content="MiMo" Tag="mimo" />
+                    <ComboBoxItem Content="Kimi K3" Tag="kimi-k3" />
+                    <ComboBoxItem Content="DeepSeek" Tag="deepseek" />
+                    <ComboBoxItem Content="GLM" Tag="glm" />
+                </ComboBox>
+                <Button x:Name="ApiSettingsButton"
+                        Style="{ThemeResource SubtleButtonStyle}"
+                        ToolTipService.ToolTip="翻译设置（Ctrl+,）"
+                        Click="ApiSettingsButton_Click">
+                    <FontIcon Glyph="&#xE713;" FontSize="14" />
+                </Button>
+                <Button x:Name="LibraryButton"
+                        Style="{ThemeResource SubtleButtonStyle}"
+                        ToolTipService.ToolTip="文献库"
+                        Click="LibraryButton_Click">
+                    <FontIcon Glyph="&#xE8F1;" FontSize="14" />
+                </Button>
+                <Button Style="{ThemeResource SubtleButtonStyle}"
+                        ToolTipService.ToolTip="键盘快捷键"
+                        Click="ShortcutsButton_Click">
+                    <FontIcon Glyph="&#xE765;" FontSize="14" />
+                </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Main content -->
+        <Grid Grid.Row="2" Margin="16,12">
+            <SplitView x:Name="ReaderSplitView"
+                       IsPaneOpen="True"
+                       OpenPaneLength="172"
+                       CompactPaneLength="0"
+                       DisplayMode="Inline"
+                       PanePlacement="Left"
+                       PaneBackground="Transparent"
+                       PaneClosed="ReaderSplitView_PaneClosed">
+                <SplitView.Pane>
+
+            <!-- Thumbnail navigation pane -->
+            <Border x:Name="ThumbnailPane"
+                    Style="{ThemeResource TransReaderCardStyle}"
+                    Width="160"
+                    Margin="0,0,12,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="44" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Grid Padding="14,0" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
+                        <TextBlock Text="页面" Style="{ThemeResource TransReaderSectionTitleStyle}" VerticalAlignment="Center" />
+                        <TextBlock x:Name="ThumbnailCountText"
+                                   Style="{ThemeResource TransReaderCaptionStyle}"
+                                   HorizontalAlignment="Right"
+                                   VerticalAlignment="Center" />
+                    </Grid>
+                    <ListView x:Name="ThumbnailList"
+                              Grid.Row="1"
+                              Padding="8"
+                              SelectionMode="Single"
+                              ContainerContentChanging="ThumbnailList_ContainerContentChanging"
+                              SelectionChanged="ThumbnailList_SelectionChanged">
+                        <ListView.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <ItemsStackPanel Orientation="Vertical" />
+                            </ItemsPanelTemplate>
+                        </ListView.ItemsPanel>
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="local:ThumbnailItem">
+                                <StackPanel Spacing="4">
+                                    <Border Background="{ThemeResource TransReaderImageBackdropBrush}"
+                                            BorderBrush="{Binding IsCurrent, Converter={StaticResource ThumbnailBorderConverter}}"
+                                            BorderThickness="2"
+                                            CornerRadius="6"
+                                            Padding="4" MinHeight="150">
+                                        <Grid>
+                                            <Image Source="{x:Bind Image, Mode=OneWay}"
+                                                   Visibility="{x:Bind ImageVisibility, Mode=OneWay}"
+                                                   Stretch="Uniform" MinHeight="140" />
+                                            <StackPanel Visibility="{x:Bind LoadingVisibility, Mode=OneWay}"
+                                                        HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
+                                                <FontIcon Glyph="&#xE8A5;" FontSize="22" Opacity="0.45" />
+                                                <ProgressRing IsActive="True" Width="22" Height="22" />
+                                                <TextBlock Text="{x:Bind PageLabel}" Style="{ThemeResource TransReaderCaptionStyle}" HorizontalAlignment="Center" />
+                                            </StackPanel>
+                                            <StackPanel Visibility="{x:Bind FailedVisibility, Mode=OneWay}"
+                                                        HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="6">
+                                                <FontIcon Glyph="&#xE783;" FontSize="20" />
+                                                <TextBlock Text="加载失败" Style="{ThemeResource TransReaderCaptionStyle}" />
+                                                <Button Content="重试" Padding="12,2" Click="ThumbnailRetry_Click" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                    <TextBlock Text="{x:Bind PageLabel}"
+                                               Style="{ThemeResource TransReaderCaptionStyle}"
+                                               HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                <Setter Property="Padding" Value="2" />
+                                <Setter Property="Margin" Value="0,0,0,6" />
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                    </ListView>
+                </Grid>
+            </Border>
+                </SplitView.Pane>
+                <SplitView.Content>
+
+            <!-- Reader area -->
+            <Grid x:Name="ReaderGrid" ColumnSpacing="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition x:Name="OriginalColumn" Width="11*" />
+                    <ColumnDefinition Width="12" />
+                    <!-- MinWidth 保证头部（徽章+助手按钮+状态 pill）在窄栏时不被挤出可视区。 -->
+                    <ColumnDefinition x:Name="TranslationColumn" Width="10*" MinWidth="380" />
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" Style="{ThemeResource TransReaderCardStyle}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="44" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <Grid Padding="14,0" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
+                            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                <FontIcon Glyph="&#xE8A5;" FontSize="14" />
+                                <TextBlock Text="原始页面" Style="{ThemeResource TransReaderSectionTitleStyle}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <ScrollViewer x:Name="OriginalPageScrollViewer"
+                                      Grid.Row="1"
+                                      HorizontalScrollBarVisibility="Auto"
+                                      VerticalScrollBarVisibility="Auto"
+                                      ZoomMode="Enabled"
+                                      MinZoomFactor="0.25"
+                                      MaxZoomFactor="4"
+                                      SizeChanged="OriginalPageScrollViewer_SizeChanged"
+                                      ViewChanged="OriginalPageScrollViewer_ViewChanged">
+                            <Grid x:Name="OriginalPageHost"
+                                  Padding="16"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Top">
+                                <Border x:Name="OriginalPageBorder"
+                                        Background="{ThemeResource TransReaderImageBackdropBrush}"
+                                        CornerRadius="6"
+                                        Padding="8"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Top">
+                                    <Image x:Name="OriginalPageImage" Stretch="Uniform" />
+                                </Border>
+                                <!-- 首次打开提示已移至 WelcomeOverlay 跨栏居中层 -->
+                            </Grid>
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+
+                <controls:GridSplitter Grid.Column="1"
+                                       HorizontalAlignment="Stretch"
+                                       VerticalAlignment="Stretch"
+                                       ResizeDirection="Columns" />
+
+                <Border Grid.Column="2" Style="{ThemeResource TransReaderCardStyle}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="44" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <Grid Padding="14,0" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
+                            <StackPanel x:Name="TranslationHeaderTitle" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                <FontIcon Glyph="&#xE8C1;" FontSize="14" />
+                                <TextBlock Text="中文译文" Style="{ThemeResource TransReaderSectionTitleStyle}" />
+                            </StackPanel>
+                            <StackPanel x:Name="AssistantHeaderTitle" Orientation="Horizontal" Spacing="8"
+                                        VerticalAlignment="Center" Visibility="Collapsed">
+                                <FontIcon Glyph="&#xE8BD;" FontSize="14" />
+                                <TextBlock Text="AI 阅读助手" Style="{ThemeResource TransReaderSectionTitleStyle}" />
+                            </StackPanel>
+                            <StackPanel x:Name="TranslationHeaderActions" HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                <Button x:Name="ReaderAssistantButton" Click="ReaderAssistantButton_Click"
+                                        Style="{ThemeResource SubtleButtonStyle}"
+                                        Width="34" Height="32" Padding="0" IsEnabled="False"
+                                        ToolTipService.ToolTip="打开 AI 阅读助手">
+                                    <FontIcon Glyph="&#xE8BD;" FontSize="14" />
+                                </Button>
+                                <Border Height="26" Padding="8,0"
+                                        Background="{ThemeResource AccentFillColorSecondaryBrush}"
+                                        CornerRadius="{ThemeResource TransReaderPillCornerRadius}">
+                                    <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
+                                        <ProgressRing x:Name="TranslationProgress" Width="12" Height="12"
+                                                      IsActive="False" Visibility="Collapsed"
+                                                      Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}" />
+                                        <FontIcon x:Name="TranslationStateIcon" Glyph="&#xE823;" FontSize="12"
+                                                  Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}" />
+                                        <TextBlock x:Name="TranslationStateText"
+                                                   Text="等待文档"
+                                                   FontSize="12" LineHeight="16"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                            <Button x:Name="ReturnToTranslationButton"
+                                    HorizontalAlignment="Right" VerticalAlignment="Center"
+                                    Height="32" Padding="10,0" Visibility="Collapsed"
+                                    Click="ReturnToTranslationButton_Click"
+                                    ToolTipService.ToolTip="返回中文译文">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE72B;" FontSize="12" />
+                                    <TextBlock Text="返回译文" FontSize="12" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+
+                        <StackPanel x:Name="TranslationInfoBars" Grid.Row="1" Margin="14,12,14,0" Spacing="8">
+                            <InfoBar x:Name="PageErrorBar"
+                                     IsOpen="False"
+                                     IsClosable="True"
+                                     Severity="Error" />
+                            <InfoBar x:Name="LocalTranslationHintBar"
+                                     IsOpen="False"
+                                     IsClosable="False"
+                                     Severity="Warning"
+                                     Title="本地翻译不可用"
+                                     Message="请在翻译设置中安装或修复本地 AI。" />
+                            <StackPanel x:Name="LocalTranslationRecoveryActions"
+                                        Orientation="Horizontal"
+                                        Spacing="8"
+                                        Visibility="Collapsed">
+                                <Button Content="安装 / 修复本地模型" Click="LocalAiInstallButton_Click" />
+                                <Button Content="重试" Click="RetryTranslationButton_Click" />
+                                <Button Content="临时切换在线" Click="SwitchToOnlineButton_Click" />
+                            </StackPanel>
+                            <InfoBar x:Name="ApiHintBar"
+                                     IsOpen="True"
+                                     IsClosable="False"
+                                     Severity="Informational"
+                                     Title="尚未配置翻译模型"
+                                     Message="填写 MiMo API Key 后，识别完成会自动翻译当前页。">
+                                <InfoBar.ActionButton>
+                                    <Button Content="立即配置" Click="ApiSettingsButton_Click" />
+                                </InfoBar.ActionButton>
+                            </InfoBar>
+                        </StackPanel>
+
+                        <Grid Grid.Row="2">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <TextBlock x:Name="TranslationTitle" Height="44" Margin="24,0"
+                                       Text="等待打开 PDF" FontSize="18" FontWeight="SemiBold"
+                                       VerticalAlignment="Center" TextWrapping="NoWrap"
+                                       TextTrimming="CharacterEllipsis" />
+                            <WebView2 x:Name="TranslationWebView" Grid.Row="1" />
+                            <TextBlock x:Name="TranslationBody" Grid.Row="1" Margin="26,12"
+                                       Text="页面文字会在本机通过 PaddleOCR 识别，再发送到你配置的翻译接口。"
+                                       Style="{ThemeResource TransReaderBodyParagraphStyle}" />
+                            <Border x:Name="SourceTextPanel" Grid.Row="2"
+                                    Margin="14,0,14,12"
+                                    BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="{ThemeResource TransReaderControlCornerRadius}">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="40" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <ToggleButton x:Name="SourceTextToggle"
+                                                  Padding="12,0"
+                                                  HorizontalContentAlignment="Stretch"
+                                                  Background="Transparent"
+                                                  BorderThickness="0"
+                                                  AutomationProperties.Name="查看 OCR 原文"
+                                                  Checked="SourceTextToggle_Toggled"
+                                                  Unchecked="SourceTextToggle_Toggled">
+                                        <ToggleButton.Resources>
+                                            <!-- 展开态保持中性，不要整条 accent 蓝（割裂且"查看"文字不可读）。 -->
+                                            <StaticResource x:Key="ToggleButtonBackground" ResourceKey="SubtleFillColorTransparentBrush" />
+                                            <StaticResource x:Key="ToggleButtonBackgroundPointerOver" ResourceKey="SubtleFillColorSecondaryBrush" />
+                                            <StaticResource x:Key="ToggleButtonBackgroundPressed" ResourceKey="SubtleFillColorTertiaryBrush" />
+                                            <StaticResource x:Key="ToggleButtonBackgroundChecked" ResourceKey="SubtleFillColorSecondaryBrush" />
+                                            <StaticResource x:Key="ToggleButtonBackgroundCheckedPointerOver" ResourceKey="SubtleFillColorSecondaryBrush" />
+                                            <StaticResource x:Key="ToggleButtonBackgroundCheckedPressed" ResourceKey="SubtleFillColorTertiaryBrush" />
+                                            <StaticResource x:Key="ToggleButtonForeground" ResourceKey="TextFillColorPrimaryBrush" />
+                                            <StaticResource x:Key="ToggleButtonForegroundPointerOver" ResourceKey="TextFillColorPrimaryBrush" />
+                                            <StaticResource x:Key="ToggleButtonForegroundPressed" ResourceKey="TextFillColorSecondaryBrush" />
+                                            <StaticResource x:Key="ToggleButtonForegroundChecked" ResourceKey="TextFillColorPrimaryBrush" />
+                                            <StaticResource x:Key="ToggleButtonForegroundCheckedPointerOver" ResourceKey="TextFillColorPrimaryBrush" />
+                                            <StaticResource x:Key="ToggleButtonForegroundCheckedPressed" ResourceKey="TextFillColorSecondaryBrush" />
+                                        </ToggleButton.Resources>
+                                        <Grid ColumnSpacing="8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <FontIcon Grid.Column="0" Glyph="&#xE8A5;" FontSize="13" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="1" Text="OCR 原文" FontSize="13" FontWeight="SemiBold"
+                                                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                                <TextBlock x:Name="SourceTextActionLabel" Text="查看" Style="{ThemeResource TransReaderCaptionStyle}" />
+                                                <FontIcon x:Name="SourceTextChevron" Glyph="&#xE70D;" FontSize="12" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </ToggleButton>
+                                    <ScrollViewer x:Name="SourceTextDrawer"
+                                                  Grid.Row="1"
+                                                  Visibility="Collapsed"
+                                                  MaxHeight="260"
+                                                  BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                                                  BorderThickness="0,1,0,0">
+                                        <Border Background="{ThemeResource LayerFillColorDefaultBrush}">
+                                            <StackPanel>
+                                                <TextBlock x:Name="SourceMetaText"
+                                                           Padding="14,8,14,2"
+                                                           Style="{ThemeResource TransReaderCaptionStyle}"
+                                                           Text="识别完成后显示原文" />
+                                                <ItemsControl x:Name="SourceBlocksList">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Border Padding="14,7"
+                                                                    BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                                                                    BorderThickness="0,0,0,1">
+                                                                <TextBlock Text="{Binding Text}"
+                                                                           FontSize="13"
+                                                                           LineHeight="20"
+                                                                           TextWrapping="Wrap"
+                                                                           IsTextSelectionEnabled="True" />
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                                <TextBlock x:Name="SourceEmptyText"
+                                                           Text="这一页没有识别到文字。"
+                                                           Padding="14,10"
+                                                           Visibility="Collapsed"
+                                                           Style="{ThemeResource TransReaderCaptionStyle}" />
+                                            </StackPanel>
+                                        </Border>
+                                    </ScrollViewer>
+                                </Grid>
+                            </Border>
+                        </Grid>
+                    </Grid>
+                </Border>
+            </Grid>
+                </SplitView.Content>
+            </SplitView>
+
+            <!-- 首次打开欢迎层：覆盖整个阅读区（缩略图栏+阅读区），仅无文档时显示 -->
+            <Grid x:Name="WelcomeOverlay" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="14">
+                    <Border Width="88" Height="88" Background="{ThemeResource SubtleFillColorSecondaryBrush}" CornerRadius="44">
+                        <FontIcon Glyph="&#xE8A5;" FontSize="40" Opacity="0.7" />
+                    </Border>
+                    <TextBlock Text="打开 PDF 开始阅读" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                    <TextBlock Text="支持文字 PDF 与扫描版 PDF · 可拖拽文件到窗口 · 快捷键 Ctrl+O"
+                               Style="{ThemeResource TransReaderCaptionStyle}" HorizontalAlignment="Center" />
+                    <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center" Margin="0,6,0,0">
+                        <Button Content="选择 PDF" Click="OpenButton_Click" Style="{ThemeResource AccentButtonStyle}" />
+                        <Button Content="进入文献库" Click="LibraryButton_Click" />
+                    </StackPanel>
+                </StackPanel>
+            </Grid>
+
+            <!-- 文献库 2.0：虚拟目录、历史视图、托管副本和非打断式 AI 待确认。 -->
+            <Grid x:Name="LibraryView" Visibility="Collapsed" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                <Grid Padding="16,10" ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="300" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="LibrarySearchBox" PlaceholderText="搜索标题、作者、目录、标签和 AI 摘要"
+                             TextChanged="LibrarySearchBox_TextChanged" AutomationProperties.Name="搜索文献库" />
+                    <ComboBox x:Name="LibrarySortBox" Grid.Column="1" Width="124" SelectedIndex="0"
+                              SelectionChanged="LibrarySortBox_SelectionChanged" AutomationProperties.Name="文献排序">
+                        <ComboBoxItem Content="最近打开" />
+                        <ComboBoxItem Content="最近添加" />
+                        <ComboBoxItem Content="标题" />
+                        <ComboBoxItem Content="阅读进度" />
+                    </ComboBox>
+                    <ComboBox x:Name="LibraryFilterBox" Grid.Column="2" Width="112" SelectedIndex="0"
+                              SelectionChanged="LibraryFilterBox_SelectionChanged" AutomationProperties.Name="文献筛选">
+                        <ComboBoxItem Content="全部" /><ComboBoxItem Content="收藏" />
+                        <ComboBoxItem Content="待读" /><ComboBoxItem Content="阅读中" />
+                        <ComboBoxItem Content="已读" /><ComboBoxItem Content="待确认" />
+                        <ComboBoxItem Content="未分类" /><ComboBoxItem Content="文件异常" />
+                        <ComboBoxItem Content="待分析" />
+                    </ComboBox>
+                    <Button Grid.Column="3" Content="添加文件…" Click="LibraryAddButton_Click" />
+                    <Button Grid.Column="4" Content="批量添加…" Click="LibraryAddBatchButton_Click" />
+                    <Button Grid.Column="5" Content="扫描文件夹…" Click="LibraryAddFolderButton_Click" />
+                    <StackPanel Grid.Column="6" HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <ProgressRing x:Name="LibraryBusyRing" IsActive="False" Width="20" Height="20" />
+                        <TextBlock x:Name="LibraryBusyText" Style="{ThemeResource TransReaderCaptionStyle}" />
+                        <HyperlinkButton x:Name="LibraryAnalysisActionLink"
+                                         Content="改用在线分析"
+                                         Visibility="Collapsed"
+                                         Click="LibraryAnalysisActionLink_Click" />
+                    </StackPanel>
+                </Grid>
+                </ScrollViewer>
+
+                <Grid Grid.Row="1" Margin="16,0,16,16" ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition x:Name="LibraryNavigationColumn" Width="220" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition x:Name="LibraryDetailsColumn" Width="320" />
+                    </Grid.ColumnDefinitions>
+                    <Border x:Name="LibraryNavigationPane" Style="{ThemeResource TransReaderCardStyle}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <ToggleButton x:Name="LibraryModeToggle" Margin="8" HorizontalAlignment="Stretch"
+                                          Content="分类  /  历史" IsChecked="False" Checked="LibraryModeToggle_Toggled"
+                                          Unchecked="LibraryModeToggle_Toggled" AutomationProperties.Name="切换分类和历史" />
+                            <ListView x:Name="LibraryNavigationList" Grid.Row="1" Margin="4,0"
+                                      SelectionChanged="LibraryNavigationList_SelectionChanged">
+                                <ListView.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid MinHeight="32">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding DisplayLabel}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Count}" VerticalAlignment="Center" Opacity="0.55"
+                                                       Style="{ThemeResource TransReaderCaptionStyle}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                            <StackPanel Grid.Row="2" Margin="8" Spacing="6">
+                                <Button Content="新建目录" HorizontalAlignment="Stretch" Click="LibraryNewFolderButton_Click" />
+                                <Button Content="管理所选目录" HorizontalAlignment="Stretch" Click="LibraryManageFolderButton_Click" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <Border Grid.Column="1" Style="{ThemeResource TransReaderCardStyle}" AllowDrop="True"
+                            DragOver="LibraryView_DragOver" Drop="LibraryView_Drop">
+                        <Grid>
+                            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                            <Grid Padding="14,10" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button x:Name="LibraryCompactNavigationButton" Content="分类" Padding="10,3" Visibility="Collapsed"
+                                            Click="LibraryCompactNavigationButton_Click" AutomationProperties.Name="显示或隐藏分类栏" />
+                                    <TextBlock x:Name="LibraryResultTitle" Text="全部文献" VerticalAlignment="Center" Style="{ThemeResource TransReaderSectionTitleStyle}" />
+                                </StackPanel>
+                                <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8">
+                                    <TextBlock x:Name="LibraryResultCount" VerticalAlignment="Center" Style="{ThemeResource TransReaderCaptionStyle}" />
+                                    <Button Content="批量操作" Padding="10,3" AutomationProperties.Name="批量操作">
+                                        <Button.Flyout>
+                                            <MenuFlyout>
+                                                <MenuFlyoutItem Text="全部设为待读" Tag="ToRead" Click="LibraryBatchStatus_Click" />
+                                                <MenuFlyoutItem Text="全部设为阅读中" Tag="Reading" Click="LibraryBatchStatus_Click" />
+                                                <MenuFlyoutItem Text="全部设为已读" Tag="Read" Click="LibraryBatchStatus_Click" />
+                                                <MenuFlyoutSeparator />
+                                                <MenuFlyoutItem Text="移动当前结果到目录…" Click="LibraryBatchMove_Click" />
+                                                <MenuFlyoutItem Text="将当前结果移入回收站" Click="LibraryBatchTrash_Click" />
+                                            </MenuFlyout>
+                                        </Button.Flyout>
+                                    </Button>
+                                    <Button x:Name="LibraryCompactDetailsButton" Content="详情" Padding="10,3" Visibility="Collapsed"
+                                            Click="LibraryCompactDetailsButton_Click" AutomationProperties.Name="显示或隐藏文献详情" />
+                                </StackPanel>
+                            </Grid>
+                            <ListView x:Name="LibraryListView" Grid.Row="1" SelectionMode="Single"
+                                      SelectionChanged="LibraryListView_SelectionChanged" DoubleTapped="LibraryListView_DoubleTapped"
+                                      KeyDown="LibraryListView_KeyDown">
+                                <ListView.ItemsPanel><ItemsPanelTemplate><ItemsStackPanel Orientation="Vertical" /></ItemsPanelTemplate></ListView.ItemsPanel>
+                                <ListView.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="4,8" ColumnSpacing="12" MinHeight="82">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="56" /><ColumnDefinition Width="*" /><ColumnDefinition Width="90" /></Grid.ColumnDefinitions>
+                                            <Border Width="52" Height="70" CornerRadius="5" Background="{ThemeResource TransReaderImageBackdropBrush}">
+                                                <Grid>
+                                                    <FontIcon Glyph="&#xE8A5;" FontSize="24" Opacity="0.35" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                    <Image Source="{Binding ThumbnailUri}" Stretch="UniformToFill" AutomationProperties.Name="首页缩略图" />
+                                                </Grid>
+                                            </Border>
+                                            <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding AuthorsYearLabel}" Style="{ThemeResource TransReaderCaptionStyle}" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding FolderPath}" Foreground="{ThemeResource TransReaderBrandBrush}" FontSize="12" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding TagsLabel}" Style="{ThemeResource TransReaderCaptionStyle}" TextTrimming="CharacterEllipsis" />
+                                                <ProgressBar Value="{Binding Progress}" Maximum="1" Height="3" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2" Spacing="5" VerticalAlignment="Center" HorizontalAlignment="Right">
+                                                <TextBlock Text="{Binding AnalysisStatusLabel}" Style="{ThemeResource TransReaderCaptionStyle}" />
+                                                <TextBlock Text="{Binding ReadingStatusLabel}" Style="{ThemeResource TransReaderCaptionStyle}" />
+                                                <TextBlock Text="{Binding LastOpenedAtLabel}" Style="{ThemeResource TransReaderCaptionStyle}" TextAlignment="Right" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                        </Grid>
+                    </Border>
+
+                    <Border x:Name="LibraryDetailsPane" Grid.Column="2" Style="{ThemeResource TransReaderCardStyle}">
+                        <ScrollViewer>
+                            <StackPanel Margin="16,14" Spacing="10">
+                                <TextBlock Text="文献详情" Style="{ThemeResource TransReaderSectionTitleStyle}" />
+                                <TextBox x:Name="LibraryEditTitle" Header="标题" />
+                                <TextBox x:Name="LibraryEditAuthors" Header="作者" />
+                                <NumberBox x:Name="LibraryEditYear" Header="年份" SpinButtonPlacementMode="Compact" />
+                                <ComboBox x:Name="LibraryEditFolder" Header="主目录" DisplayMemberPath="Path" />
+                                <TextBox x:Name="LibraryEditTags" Header="标签（逗号分隔）" />
+                                <ComboBox x:Name="LibraryReadingStatusBox" Header="阅读状态" SelectedIndex="0">
+                                    <ComboBoxItem Content="待读" /><ComboBoxItem Content="阅读中" /><ComboBoxItem Content="已读" />
+                                </ComboBox>
+                                <CheckBox x:Name="LibraryFavoriteCheck" Content="收藏" />
+                                <TextBox x:Name="LibraryEditSummary" Header="AI 摘要" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80" />
+                                <InfoBar x:Name="LibraryProposalBar" IsOpen="False" IsClosable="False" Severity="Informational"
+                                         Title="AI 分类建议">
+                                    <InfoBar.ActionButton><Button Content="接受建议" Click="LibraryAcceptProposalButton_Click" /></InfoBar.ActionButton>
+                                </InfoBar>
+                                <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                    <Button Content="保存" Click="LibrarySaveEditButton_Click" HorizontalAlignment="Stretch" />
+                                    <Button Grid.Column="1" Content="打开" Click="LibraryOpenButton_Click" HorizontalAlignment="Stretch" />
+                                </Grid>
+                                <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                    <Button Content="从头阅读" Click="LibraryOpenFromStartButton_Click" HorizontalAlignment="Stretch" />
+                                    <Button Grid.Column="1" Content="重新 AI 分析" Click="LibraryReclassifyButton_Click" HorizontalAlignment="Stretch" />
+                                </Grid>
+                                <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                    <Button Content="导出副本" Click="LibraryExportButton_Click" HorizontalAlignment="Stretch" />
+                                    <Button Grid.Column="1" Content="定位托管副本" Click="LibraryLocateButton_Click" HorizontalAlignment="Stretch" />
+                                </Grid>
+                                <Button x:Name="LibraryTrashButton" Content="移入回收站" Click="LibraryRemoveButton_Click" HorizontalAlignment="Stretch" />
+                                <Button x:Name="LibraryDeletePermanentlyButton" Content="永久删除" Click="LibraryDeletePermanentlyButton_Click"
+                                        HorizontalAlignment="Stretch" Visibility="Collapsed" />
+                                <TextBlock Text="文件信息" FontWeight="SemiBold" Margin="0,8,0,0" />
+                                <TextBlock x:Name="LibraryInfoText" TextWrapping="Wrap" Style="{ThemeResource TransReaderCaptionStyle}" />
+                                <TextBlock Text="原始来源" FontWeight="SemiBold" />
+                                <TextBlock x:Name="LibrarySourcesText" TextWrapping="Wrap" IsTextSelectionEnabled="True" Style="{ThemeResource TransReaderCaptionStyle}" />
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Border>
+                </Grid>
+            </Grid>
+
+            <!-- AI 中心设置视图宿主（覆盖阅读区，与文献库视图互斥） -->
+            <Border x:Name="SettingsHost" Visibility="Collapsed"
+                    Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
+                <ContentControl x:Name="SettingsHostContent"
+                                HorizontalContentAlignment="Stretch"
+                                VerticalContentAlignment="Stretch" />
+            </Border>
+        </Grid>
+
+        <!-- Status bar -->
+        <Border Grid.Row="3"
+                Padding="16,0"
+                MinHeight="32"
+                Background="Transparent"
+                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                BorderThickness="0,1,0,0">
+            <Grid>
+                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <FontIcon Glyph="&#xE946;" FontSize="12" />
+                    <TextBlock x:Name="StatusText" Text="就绪 · 打开 PDF 开始阅读" Style="{ThemeResource TransReaderCaptionStyle}" />
+                </StackPanel>
+                <StackPanel x:Name="StatusDetailsPanel" HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <TextBlock x:Name="EngineText" Text="PaddleOCR · CPU" Style="{ThemeResource TransReaderCaptionStyle}" />
+                    <TextBlock Text="·" Opacity="0.45" Style="{ThemeResource TransReaderCaptionStyle}" />
+                    <TextBlock x:Name="ModelStatusText" Text="MiMo 未配置" Style="{ThemeResource TransReaderCaptionStyle}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+
+        <ContentDialog x:Name="ShortcutsDialog"
+                       Grid.RowSpan="4"
+                       Title="键盘快捷键"
+                       CloseButtonText="关闭">
+            <StackPanel Spacing="10" MinWidth="360">
+                <TextBlock Text="← / Page Up · 上一页" />
+                <TextBlock Text="→ / Page Down · 下一页" />
+                <TextBlock Text="Home / End · 第一页 / 最后一页" />
+                <TextBlock Text="Ctrl + O · 打开 PDF" />
+                <TextBlock Text="Ctrl + R · 重新翻译当前页" />
+                <TextBlock Text="Ctrl + , · 翻译设置" />
+            </StackPanel>
+        </ContentDialog>
+
+    </Grid>
+</Window>

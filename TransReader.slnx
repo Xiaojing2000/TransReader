@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="src/TransReader.App/TransReader.App.csproj" />
+  <Project Path="src/TransReader.Core/TransReader.Core.csproj" />
+  <Project Path="tests/TransReader.Core.Tests/TransReader.Core.Tests.csproj" />
+</Solution>
