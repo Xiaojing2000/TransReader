@@ -1,9 +1,9 @@
 <div align="center">
-  <img src="src/TransReader.App/Assets/AppIcon-128.png" width="96" alt="译页 TransReader 图标">
+  <img src="https://raw.githubusercontent.com/Xiaojing2000/TransReader/main/src/TransReader.App/Assets/AppIcon-256.png" width="96" alt="译页 TransReader 图标">
   <h1>译页 TransReader</h1>
   <p><strong>别离开论文，让翻译来到页面旁边。</strong></p>
   <p>一个面向 Windows 的本地优先 PDF 翻译阅读器：适合论文、书籍、说明书、公式和那些值得你停下来真正读懂的段落。</p>
-  <p><strong>简体中文</strong> · <a href="README.md">English</a></p>
+  <p><strong>简体中文</strong> · <a href="README.en.md">English</a></p>
   <p>
     <img src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=for-the-badge&logo=windows11&logoColor=white" alt="Windows 10 和 11">
     <img src="https://img.shields.io/badge/.NET-10-512BD4?style=for-the-badge&logo=dotnet&logoColor=white" alt=".NET 10">
@@ -12,7 +12,9 @@
   </p>
 </div>
 
-![译页 TransReader 对照阅读主界面](docs/images/reader-overview.jpg)
+![译页 TransReader 对照阅读主界面](https://raw.githubusercontent.com/Xiaojing2000/TransReader/main/docs/images/reader-overview.jpg)
+
+<p align="center"><strong><a href="https://github.com/Xiaojing2000/TransReader/releases/latest">🚀 前往 Releases 下载最新版本</a></strong></p>
 
 ## 读一篇难论文，不该像同时操作五个工具
 
@@ -22,7 +24,7 @@
 
 终于可以少一点来回横跳：打开 PDF，然后真的开始读。
 
-<p align="center"><img src="docs/images/feature-grid.zh-CN.svg" width="100%" alt="译页功能卡片"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/Xiaojing2000/TransReader/main/docs/images/feature-grid.zh-CN.svg" width="100%" alt="译页功能卡片"></p>
 
 ## 它能帮你做什么
 
@@ -36,8 +38,8 @@
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/images/library.jpg" alt="译页文献库"></td>
-    <td width="50%"><img src="docs/images/ai-center.jpg" alt="译页 AI 中心"></td>
+    <td width="50%"><img src="https://raw.githubusercontent.com/Xiaojing2000/TransReader/main/docs/images/library.jpg" alt="译页文献库"></td>
+    <td width="50%"><img src="https://raw.githubusercontent.com/Xiaojing2000/TransReader/main/docs/images/ai-center.jpg" alt="译页 AI 中心"></td>
   </tr>
   <tr>
     <td><strong>为长期阅读准备的文献库</strong><br>搜索、分类、标签、收藏、进度和缓存都在这里，不必在下载目录里反复打开匿名文件。</td>
@@ -56,7 +58,15 @@
 | `TransReader-vX.Y.Z-win-x64-setup.exe` | 希望像普通 Windows 软件一样安装：开始菜单、可选桌面快捷方式、覆盖升级和标准卸载入口。**推荐大多数用户选择。** |
 | `TransReader-vX.Y.Z-win-x64-portable.zip` | 希望自己管理目录、放在其他磁盘，或当前电脑没有软件安装权限。 |
 
-请从仓库的 **Releases** 页面下载。每个版本同时提供 `TransReader-vX.Y.Z-SHA256SUMS.txt`，用于核对安装包完整性。
+### 立即下载
+
+- [Windows 安装版（推荐）](https://github.com/Xiaojing2000/TransReader/releases/latest/download/TransReader-v0.3.0-win-x64-setup.exe)
+- [Windows 便携版](https://github.com/Xiaojing2000/TransReader/releases/latest/download/TransReader-v0.3.0-win-x64-portable.zip)
+- [SHA-256 校验文件](https://github.com/Xiaojing2000/TransReader/releases/latest/download/TransReader-v0.3.0-SHA256SUMS.txt)
+- [源代码 ZIP](https://github.com/Xiaojing2000/TransReader/archive/refs/tags/v0.3.0.zip)
+- [查看全部版本与发行说明](https://github.com/Xiaojing2000/TransReader/releases)
+
+GitHub Release 还会为每个标签自动提供 `Source code (zip)` 与 `Source code (tar.gz)`。校验文件用于确认安装包下载完整。
 
 > 社区构建目前可能没有商业代码签名。如果 Windows SmartScreen 显示“未知发布者”，请先核对 SHA-256，并确认文件确实来自本仓库 Releases；不要使用网盘或二次打包站来源。
 

@@ -1,9 +1,9 @@
 <div align="center">
-  <img src="src/TransReader.App/Assets/AppIcon-128.png" width="96" alt="TransReader icon">
+  <img src="https://raw.githubusercontent.com/Xiaojing2000/TransReader/main/src/TransReader.App/Assets/AppIcon-256.png" width="96" alt="TransReader icon">
   <h1>TransReader</h1>
   <p><strong>Stay with the paper. Let translation meet you on the page.</strong></p>
   <p>A local-first PDF translation reader for Windows - built for papers, books, manuals, formulas, and the moments when a paragraph deserves more than a quick copy-and-paste.</p>
-  <p><a href="README.zh-CN.md">简体中文</a> · <strong>English</strong></p>
+  <p><a href="README.md">简体中文</a> · <strong>English</strong></p>
   <p>
     <img src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=for-the-badge&logo=windows11&logoColor=white" alt="Windows 10 and 11">
     <img src="https://img.shields.io/badge/.NET-10-512BD4?style=for-the-badge&logo=dotnet&logoColor=white" alt=".NET 10">
@@ -12,7 +12,9 @@
   </p>
 </div>
 
-![TransReader side-by-side reader](docs/images/reader-overview.jpg)
+![TransReader side-by-side reader](https://raw.githubusercontent.com/Xiaojing2000/TransReader/main/docs/images/reader-overview.jpg)
+
+<p align="center"><strong><a href="https://github.com/Xiaojing2000/TransReader/releases/latest">🚀 Download the latest release</a></strong></p>
 
 ## Reading a hard PDF should not feel like operating five different tools
 
@@ -22,7 +24,7 @@ You know the routine: open the paper, copy a paragraph, repair a broken formula,
 
 It is surprisingly refreshing: open the PDF, start reading, and remain in the same place.
 
-<p align="center"><img src="docs/images/feature-grid.svg" width="100%" alt="TransReader feature cards"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/Xiaojing2000/TransReader/main/docs/images/feature-grid.svg" width="100%" alt="TransReader feature cards"></p>
 
 ## What makes it useful
 
@@ -36,8 +38,8 @@ It is surprisingly refreshing: open the PDF, start reading, and remain in the sa
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/images/library.jpg" alt="TransReader document library"></td>
-    <td width="50%"><img src="docs/images/ai-center.jpg" alt="TransReader AI Center"></td>
+    <td width="50%"><img src="https://raw.githubusercontent.com/Xiaojing2000/TransReader/main/docs/images/library.jpg" alt="TransReader document library"></td>
+    <td width="50%"><img src="https://raw.githubusercontent.com/Xiaojing2000/TransReader/main/docs/images/ai-center.jpg" alt="TransReader AI Center"></td>
   </tr>
   <tr>
     <td><strong>A library for long reading</strong><br>Search, classify, tag, favorite, resume, and keep reading progress instead of reopening anonymous files from a downloads folder.</td>
@@ -56,7 +58,15 @@ TransReader currently ships for **Windows x64** in two familiar formats:
 | `TransReader-vX.Y.Z-win-x64-setup.exe` | You want the normal Windows installation experience: Start Menu entry, optional desktop shortcut, repair-friendly upgrades, and a standard uninstaller. **Recommended for most people.** |
 | `TransReader-vX.Y.Z-win-x64-portable.zip` | You want to extract the app yourself, keep it on another drive, or use it without an installer. |
 
-Download both from the repository's **Releases** page. A `TransReader-vX.Y.Z-SHA256SUMS.txt` file is published alongside them for integrity checks.
+### Download now
+
+- [Windows setup — recommended](https://github.com/Xiaojing2000/TransReader/releases/latest/download/TransReader-v0.3.0-win-x64-setup.exe)
+- [Windows portable ZIP](https://github.com/Xiaojing2000/TransReader/releases/latest/download/TransReader-v0.3.0-win-x64-portable.zip)
+- [SHA-256 checksums](https://github.com/Xiaojing2000/TransReader/releases/latest/download/TransReader-v0.3.0-SHA256SUMS.txt)
+- [Source code ZIP](https://github.com/Xiaojing2000/TransReader/archive/refs/tags/v0.3.0.zip)
+- [All releases and release notes](https://github.com/Xiaojing2000/TransReader/releases)
+
+GitHub also generates `Source code (zip)` and `Source code (tar.gz)` automatically for every tagged release. Use the checksum file to verify downloaded packages.
 
 > Community builds may not yet have a commercial code-signing certificate. If Windows SmartScreen shows “Unknown publisher,” verify the SHA-256 file and make sure the download came from this repository's Releases page.
 
