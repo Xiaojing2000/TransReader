@@ -26,6 +26,29 @@ logs/
 *.gguf
 *.partial
 
+# Local AI-agent/workbench notes and disposable design evidence
+/.agent/
+/.agents/
+/.codex/
+/.claude/
+/.cursor/
+/AGENTS.md
+/CLAUDE.md
+/design-*.md
+/DESIGN*.md
+/notes/
+/scratch/
+/tmp/
+/temp/
+/captures/
+/screenshots/
+
+# Additional local build and packaging output
+/dist/
+/out/
+/publish/
+/release/
+
 # Local configuration and credentials (defense in depth)
 .env
 .env.*

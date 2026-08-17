@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/Xiaojing2000/TransReader/main/src/TransReader.App/Assets/AppIcon-256.png" width="96" alt="译页 TransReader 图标">
+  <img src="https://xiaojing2000.github.io/TransReader/images/app-icon.png" width="96" alt="译页 TransReader 图标">
   <h1>译页 TransReader</h1>
   <p><strong>别离开论文，让翻译来到页面旁边。</strong></p>
   <p>一个面向 Windows 的本地优先 PDF 翻译阅读器：适合论文、书籍、说明书、公式和那些值得你停下来真正读懂的段落。</p>
@@ -12,7 +12,7 @@
   </p>
 </div>
 
-![译页 TransReader 对照阅读主界面](https://raw.githubusercontent.com/Xiaojing2000/TransReader/main/docs/images/reader-overview.jpg)
+![译页 TransReader 对照阅读主界面](https://xiaojing2000.github.io/TransReader/images/reader-overview.jpg)
 
 <p align="center"><strong><a href="https://github.com/Xiaojing2000/TransReader/releases/latest">🚀 前往 Releases 下载最新版本</a></strong></p>
 
@@ -24,7 +24,7 @@
 
 终于可以少一点来回横跳：打开 PDF，然后真的开始读。
 
-<p align="center"><img src="https://raw.githubusercontent.com/Xiaojing2000/TransReader/main/docs/images/feature-grid.zh-CN.svg" width="100%" alt="译页功能卡片"></p>
+<p align="center"><img src="https://xiaojing2000.github.io/TransReader/images/feature-grid.zh-CN.svg" width="100%" alt="译页功能卡片"></p>
 
 ## 它能帮你做什么
 
@@ -38,8 +38,8 @@
 
 <table>
   <tr>
-    <td width="50%"><img src="https://raw.githubusercontent.com/Xiaojing2000/TransReader/main/docs/images/library.jpg" alt="译页文献库"></td>
-    <td width="50%"><img src="https://raw.githubusercontent.com/Xiaojing2000/TransReader/main/docs/images/ai-center.jpg" alt="译页 AI 中心"></td>
+    <td width="50%"><img src="https://xiaojing2000.github.io/TransReader/images/library.jpg" alt="译页文献库"></td>
+    <td width="50%"><img src="https://xiaojing2000.github.io/TransReader/images/ai-center.jpg" alt="译页 AI 中心"></td>
   </tr>
   <tr>
     <td><strong>为长期阅读准备的文献库</strong><br>搜索、分类、标签、收藏、进度和缓存都在这里，不必在下载目录里反复打开匿名文件。</td>

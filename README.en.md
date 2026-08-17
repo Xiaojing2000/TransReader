@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/Xiaojing2000/TransReader/main/src/TransReader.App/Assets/AppIcon-256.png" width="96" alt="TransReader icon">
+  <img src="https://xiaojing2000.github.io/TransReader/images/app-icon.png" width="96" alt="TransReader icon">
   <h1>TransReader</h1>
   <p><strong>Stay with the paper. Let translation meet you on the page.</strong></p>
   <p>A local-first PDF translation reader for Windows - built for papers, books, manuals, formulas, and the moments when a paragraph deserves more than a quick copy-and-paste.</p>
@@ -12,7 +12,7 @@
   </p>
 </div>
 
-![TransReader side-by-side reader](https://raw.githubusercontent.com/Xiaojing2000/TransReader/main/docs/images/reader-overview.jpg)
+![TransReader side-by-side reader](https://xiaojing2000.github.io/TransReader/images/reader-overview.jpg)
 
 <p align="center"><strong><a href="https://github.com/Xiaojing2000/TransReader/releases/latest">🚀 Download the latest release</a></strong></p>
 
@@ -24,7 +24,7 @@ You know the routine: open the paper, copy a paragraph, repair a broken formula,
 
 It is surprisingly refreshing: open the PDF, start reading, and remain in the same place.
 
-<p align="center"><img src="https://raw.githubusercontent.com/Xiaojing2000/TransReader/main/docs/images/feature-grid.svg" width="100%" alt="TransReader feature cards"></p>
+<p align="center"><img src="https://xiaojing2000.github.io/TransReader/images/feature-grid.svg" width="100%" alt="TransReader feature cards"></p>
 
 ## What makes it useful
 
@@ -38,8 +38,8 @@ It is surprisingly refreshing: open the PDF, start reading, and remain in the sa
 
 <table>
   <tr>
-    <td width="50%"><img src="https://raw.githubusercontent.com/Xiaojing2000/TransReader/main/docs/images/library.jpg" alt="TransReader document library"></td>
-    <td width="50%"><img src="https://raw.githubusercontent.com/Xiaojing2000/TransReader/main/docs/images/ai-center.jpg" alt="TransReader AI Center"></td>
+    <td width="50%"><img src="https://xiaojing2000.github.io/TransReader/images/library.jpg" alt="TransReader document library"></td>
+    <td width="50%"><img src="https://xiaojing2000.github.io/TransReader/images/ai-center.jpg" alt="TransReader AI Center"></td>
   </tr>
   <tr>
     <td><strong>A library for long reading</strong><br>Search, classify, tag, favorite, resume, and keep reading progress instead of reopening anonymous files from a downloads folder.</td>
