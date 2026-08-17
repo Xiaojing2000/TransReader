@@ -1,121 +1,119 @@
 <div align="center">
-  <img src="src/TransReader.App/Assets/AppIcon-128.png" width="96" alt="TransReader icon">
-  <h1>TransReader</h1>
-  <p><strong>Stay with the paper. Let translation meet you on the page.</strong></p>
-  <p>A local-first PDF translation reader for Windows - built for papers, books, manuals, formulas, and the moments when a paragraph deserves more than a quick copy-and-paste.</p>
-  <p><a href="README.zh-CN.md">简体中文</a> · <strong>English</strong></p>
+  <img src="src/TransReader.App/Assets/AppIcon-128.png" width="96" alt="译页 TransReader 图标">
+  <h1>译页 TransReader</h1>
+  <p><strong>别离开论文，让翻译来到页面旁边。</strong></p>
+  <p>一个面向 Windows 的本地优先 PDF 翻译阅读器：适合论文、书籍、说明书、公式和那些值得你停下来真正读懂的段落。</p>
+  <p><strong>简体中文</strong> · <a href="README.md">English</a></p>
   <p>
-    <img src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=for-the-badge&logo=windows11&logoColor=white" alt="Windows 10 and 11">
+    <img src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=for-the-badge&logo=windows11&logoColor=white" alt="Windows 10 和 11">
     <img src="https://img.shields.io/badge/.NET-10-512BD4?style=for-the-badge&logo=dotnet&logoColor=white" alt=".NET 10">
     <img src="https://img.shields.io/badge/OCR-PP--OCRv5-22A699?style=for-the-badge" alt="PP-OCRv5">
-    <img src="https://img.shields.io/badge/License-MIT-F4B942?style=for-the-badge" alt="MIT License">
+    <img src="https://img.shields.io/badge/开源协议-MIT-F4B942?style=for-the-badge" alt="MIT License">
   </p>
 </div>
 
-![TransReader side-by-side reader](docs/images/reader-overview.jpg)
+![译页 TransReader 对照阅读主界面](docs/images/reader-overview.jpg)
 
-## Reading a hard PDF should not feel like operating five different tools
+## 读一篇难论文，不该像同时操作五个工具
 
-You know the routine: open the paper, copy a paragraph, repair a broken formula, paste it into a translator, switch to a chat window, then hunt for the original sentence again. On a scanned PDF, add OCR to the pile. After a few pages, the document has disappeared behind the workflow.
+打开 PDF，复制一段话，修复断行和公式，粘贴到翻译网页，再切到聊天窗口提问，然后回到 PDF 里寻找刚才那句话——如果是扫描版，还要再加一个 OCR 工具。几页之后，文档反而被工作流挡住了。
 
-**TransReader keeps the document at the center.** The original page stays on the left. A clean Markdown translation grows on the right. Scanned pages go through local PP-OCRv5, formulas render with KaTeX, and a selected passage can become a focused question without losing the surrounding page or book context.
+**译页想做的事情很直接：让文档始终留在阅读中心。** 原始页面在左边，干净的 Markdown 译文在右边；扫描页自动经过本地 PP-OCRv5，公式交给 KaTeX；遇到没读懂的句子，选中就问，不必丢掉当前页面和全书上下文。
 
-It is surprisingly refreshing: open the PDF, start reading, and remain in the same place.
+终于可以少一点来回横跳：打开 PDF，然后真的开始读。
 
-<p align="center"><img src="docs/images/feature-grid.svg" width="100%" alt="TransReader feature cards"></p>
+<p align="center"><img src="docs/images/feature-grid.zh-CN.svg" width="100%" alt="译页功能卡片"></p>
 
-## What makes it useful
+## 它能帮你做什么
 
 | | |
 | --- | --- |
-| **📖 Compare without losing your place**<br>The source page and translation remain side by side. Figures, footnotes, labels, and equations are always one glance away. | **🔍 Read scanned PDFs, locally**<br>PP-OCRv5 mobile detection and recognition run on the CPU through Paddle Inference. No GPU is required. |
-| **🌐 Bring your own model**<br>Use MiMo, Kimi, DeepSeek, GLM, or any OpenAI-compatible endpoint. Text-only and multimodal providers are both supported. | **🏠 Go fully local when the document matters**<br>Install Qwen3 1.7B from inside the app. llama.cpp handles local translation, library analysis, and reader questions. |
-| **💬 Ask the paragraph, not a blank chatbot**<br>Select translated text and ask for an explanation. The assistant receives the passage, current page, and nearby reading context. | **🗂️ Build a library that remembers**<br>Keep PDFs, progress, thumbnails, OCR, translations, topics, summaries, and domain-aware terminology together. |
+| **📖 原文和译文一直在一起**<br>页面、图表、脚注、标签和公式永远只隔一眼。翻译不再把你带离原文。 | **🔍 扫描 PDF 也能直接读**<br>PP-OCRv5 mobile 检测与识别通过 Paddle Inference 在 CPU 本地运行，不要求 GPU。 |
+| **🌐 你决定使用哪个模型**<br>可用 MiMo、Kimi、DeepSeek、GLM，也可添加任意 OpenAI 兼容端点；纯文本和多模态模型都支持。 | **🏠 敏感文档可以完全本地**<br>应用内一键安装 Qwen3 1.7B，llama.cpp 负责本地翻译、文献整理和阅读问答。 |
+| **💬 问当前段落，不是面对空白聊天框**<br>选中译文即可解释；助手会结合选区、当前页和附近阅读上下文回答。 | **🗂️ 建一个真正记得进度的文献库**<br>PDF、进度、缩略图、OCR、译文、分类、摘要和术语都放在一起。 |
 
-## A quick tour
+## 看看真实界面
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/images/library.jpg" alt="TransReader document library"></td>
-    <td width="50%"><img src="docs/images/ai-center.jpg" alt="TransReader AI Center"></td>
+    <td width="50%"><img src="docs/images/library.jpg" alt="译页文献库"></td>
+    <td width="50%"><img src="docs/images/ai-center.jpg" alt="译页 AI 中心"></td>
   </tr>
   <tr>
-    <td><strong>A library for long reading</strong><br>Search, classify, tag, favorite, resume, and keep reading progress instead of reopening anonymous files from a downloads folder.</td>
-    <td><strong>One place for online and local AI</strong><br>Switch modes, manage endpoints, test connections, view usage, choose assistant behavior, and install the local model.</td>
+    <td><strong>为长期阅读准备的文献库</strong><br>搜索、分类、标签、收藏、进度和缓存都在这里，不必在下载目录里反复打开匿名文件。</td>
+    <td><strong>在线与本地 AI 放在一个地方</strong><br>切换模式、管理端点、测试连接、查看用量、选择助手来源，以及安装本地模型。</td>
   </tr>
 </table>
 
-The screenshots above are from the real Windows application using a synthetic public demo paper. No private document or API credential is shown.
+以上均为真实 Windows 应用截图，使用的是完全虚构的公开演示论文和隔离配置，没有展示私人文档或 API 凭据。
 
-## Download and install
+## 下载与安装
 
-TransReader currently ships for **Windows x64** in two familiar formats:
+译页目前提供 **Windows x64** 的两种传统发布格式：
 
-| Package | Choose it when... |
+| 安装包 | 适合你，如果…… |
 | --- | --- |
-| `TransReader-vX.Y.Z-win-x64-setup.exe` | You want the normal Windows installation experience: Start Menu entry, optional desktop shortcut, repair-friendly upgrades, and a standard uninstaller. **Recommended for most people.** |
-| `TransReader-vX.Y.Z-win-x64-portable.zip` | You want to extract the app yourself, keep it on another drive, or use it without an installer. |
+| `TransReader-vX.Y.Z-win-x64-setup.exe` | 希望像普通 Windows 软件一样安装：开始菜单、可选桌面快捷方式、覆盖升级和标准卸载入口。**推荐大多数用户选择。** |
+| `TransReader-vX.Y.Z-win-x64-portable.zip` | 希望自己管理目录、放在其他磁盘，或当前电脑没有软件安装权限。 |
 
-Download both from the repository's **Releases** page. A `TransReader-vX.Y.Z-SHA256SUMS.txt` file is published alongside them for integrity checks.
+请从仓库的 **Releases** 页面下载。每个版本同时提供 `TransReader-vX.Y.Z-SHA256SUMS.txt`，用于核对安装包完整性。
 
-> Community builds may not yet have a commercial code-signing certificate. If Windows SmartScreen shows “Unknown publisher,” verify the SHA-256 file and make sure the download came from this repository's Releases page.
+> 社区构建目前可能没有商业代码签名。如果 Windows SmartScreen 显示“未知发布者”，请先核对 SHA-256，并确认文件确实来自本仓库 Releases；不要使用网盘或二次打包站来源。
 
-See the complete [English installation and user guide](docs/INSTALL.md) or [中文安装与使用手册](docs/INSTALL.zh-CN.md).
+详细步骤见[中文安装与使用手册](docs/INSTALL.zh-CN.md)，也可切换到 [English Installation Guide](docs/INSTALL.md)。
 
-### Requirements
+### 系统要求
 
-- Windows 10 20H1 (19041) or later, x64.
-- An x64 processor with AVX support.
-- 8 GB RAM for online use; 16 GB is recommended for local AI.
-- About 600 MB for the app after installation, plus about 1.3 GB for the optional local model and runtime.
-- Microsoft Edge WebView2 Runtime (normally included with Windows 11).
+- Windows 10 20H1（19041）或更高版本，x64。
+- 支持 AVX 指令集的 x64 CPU。
+- 在线模式至少 8 GB 内存；本地 AI 建议 16 GB。
+- 应用安装后约需 600 MB；安装可选本地模型与运行时后另需约 1.3 GB。
+- Microsoft Edge WebView2 Runtime（Windows 11 通常自带）。
 
-## Start reading in three minutes
+## 三分钟开始阅读
 
-1. Install TransReader or extract the complete Portable ZIP.
-2. Open a PDF. Native PDFs and scanned pages use the same reading surface.
-3. Pick a translation path:
-   - **Online:** open AI Center, select a preset or add an OpenAI-compatible endpoint, enter the model and API key, then test it.
-   - **Local:** open AI Center → Local AI and choose Install. The model and runtime are downloaded with size and SHA-256 verification.
-4. Read the source on the left and the translation on the right. Select a passage whenever it deserves an explanation.
-5. Import documents into the library when you want progress, cached results, and organization to survive the session.
+1. 安装 TransReader，或完整解压 Portable ZIP。
+2. 打开一个 PDF。原生 PDF 和扫描 PDF 使用同一套阅读界面。
+3. 选择翻译方式：
+   - **在线模式**：打开“AI 中心”，选择预设或添加 OpenAI 兼容端点，填写模型和 API Key，然后测试连接。
+   - **本地模式**：打开“AI 中心 → 本地 AI”，点击安装。模型与运行时下载完成后会检查文件大小和 SHA-256。
+4. 左边看原页，右边读译文；遇到值得深挖的句子，选中并提问。
+5. 长期阅读的资料可以导入文献库，让进度、OCR、译文和整理结果保留下来。
 
-## Online or local? You decide per document
+## 在线还是本地？每份文档都可以自己决定
 
-| | Online API | Local AI |
+| | 在线 API | 本地 AI |
 | --- | --- | --- |
-| Best at | Strong multimodal models, speed, complex page understanding | Sensitive documents, offline reading, predictable local control |
-| Content sent out | Current page image or OCR text, necessary context, and your question | Nothing to an external model API |
-| API key | Stored in Windows Credential Manager | Not required |
-| Hardware | Modest CPU and memory | CPU inference; 16 GB RAM recommended |
-| Cost | Determined by your provider | No per-token API charge |
+| 更适合 | 强大的多模态模型、速度、复杂页面理解 | 敏感文档、离线环境、希望内容留在本机 |
+| 发送内容 | 当前页图像或 OCR 文本、必要上下文和你的问题 | 不向外部模型 API 发送页面内容 |
+| API Key | 保存于 Windows 凭据库 | 不需要 |
+| 硬件 | 普通 CPU 和内存即可 | CPU 推理，建议 16 GB 内存 |
+| 费用 | 由你选择的服务商决定 | 没有按 Token 计费的 API 成本 |
 
-OCR always runs locally. In online mode, only the endpoint you selected receives content. For confidential documents, also set Library Analysis and Reader Assistant to a local model source.
+OCR 始终在本地运行。在线模式只把内容交给你明确选择的端点。阅读保密材料时，还应把“文献库整理”和“阅读助手”的模型来源一并设为本地。
 
-## Formulas, layout, and context are first-class
+## 它不只是逐句替换词语
 
-TransReader does more than replace English words with Chinese words:
+- Markdown 与 KaTeX 保留标题、列表、代码、行内公式和独立公式。
+- 页面 OCR 缓存避免重复执行高成本识别。
+- 译文缓存让快速翻页和下次续读更顺畅。
+- 运行摘要与术语上下文让专有名词在跨页翻译时更稳定。
+- 数学、计算机、物理等领域配置会调整提示词，且允许用户覆盖领域说明。
+- 快速翻页时会取消过期任务，让后台工作跟随读者，而不是让读者等待旧页面。
 
-- Markdown and KaTeX preserve headings, lists, code, inline formulas, and display equations.
-- A page-level OCR cache avoids repeating expensive recognition work.
-- A translation cache lets you turn pages quickly and resume later.
-- A compact running summary and terminology context help names and technical terms remain stable across pages.
-- Domain profiles adapt prompts for mathematics, computer science, physics, and other material, with user-editable hints.
-- Outdated page work is cancelled when you turn quickly, so the interface follows the reader instead of a stale background task.
+## 隐私与本地数据
 
-## Privacy and local data
+- API Key 通过 Windows 凭据库保存，不进入仓库，也不写入 `settings.json`。
+- 设置、文献库、日志、本地模型和缓存位于 `%LOCALAPPDATA%\TransReader`。
+- 本地模式的页面推理不离开设备。
+- 在线模式会把内容发送到用户配置的服务商，其隐私政策、条款和费用规则仍然适用。
+- 把日志贴到公开 issue 前，请先删除个人路径、文档内容和其他敏感信息。
 
-- API keys are saved through Windows Credential Manager, not in the repository or `settings.json`.
-- Settings, library data, logs, downloaded local models, and caches live under `%LOCALAPPDATA%\TransReader`.
-- Local mode keeps page inference on the device.
-- Online mode sends content to the user-configured provider; its privacy policy, terms, and charges apply.
-- Logs should be sanitized before they are attached to a public issue.
+安全问题报告方式见 [SECURITY.md](SECURITY.md)。
 
-See [SECURITY.md](SECURITY.md) for vulnerability reporting and security guidance.
+## 从源码构建
 
-## Build from source
-
-A fresh clone can prepare the pinned native dependencies automatically:
+全新克隆后可以一键准备固定版本的原生依赖：
 
 ```powershell
 .\scripts\setup-build-dependencies.ps1
@@ -123,36 +121,36 @@ A fresh clone can prepare the pinned native dependencies automatically:
 dotnet test .\tests\TransReader.Core.Tests -c Release
 ```
 
-To create both release packages after installing Inno Setup:
+安装 Inno Setup 后，可同时生成 Setup 与 Portable：
 
 ```powershell
 .\scripts\publish.ps1 -Version 0.3.0
 ```
 
-Read [Building TransReader from Source](docs/BUILDING.md) or [中文构建手册](docs/BUILDING.zh-CN.md) for prerequisites, dependency locations, CI-only builds, and release steps.
+完整说明见[中文构建手册](docs/BUILDING.zh-CN.md)或 [Building TransReader from Source](docs/BUILDING.md)。
 
-## Project map
+## 项目结构
 
 ```text
-src/TransReader.App          WinUI 3 interface and application orchestration
-src/TransReader.Core         OCR, translation, storage, library, and document logic
-native/TransOcrNative        Stable C ABI and native PaddleOCR host
-third_party/PaddleOCR        Selected PaddleOCR C++ inference source snapshot
-tests/TransReader.Core.Tests Core unit tests
-scripts                      Dependency, build, and release automation
-installer                    Inno Setup definition
+src/TransReader.App          WinUI 3 界面与应用编排
+src/TransReader.Core         OCR、翻译、存储、文献库与文档逻辑
+native/TransOcrNative        稳定 C ABI 与 PaddleOCR 原生宿主
+third_party/PaddleOCR        选取的 PaddleOCR C++ 推理源码快照
+tests/TransReader.Core.Tests 核心单元测试
+scripts                      依赖、构建与发布自动化
+installer                    Inno Setup 安装器定义
 ```
 
-## Current scope
+## 当前边界
 
-TransReader is currently a Windows x64 project and the interface is primarily Simplified Chinese. English documentation is complete; application UI localization is a welcome future contribution. The project is moving toward its first public release, so practical bug reports and installation feedback are especially valuable.
+译页目前只支持 Windows x64，应用界面以简体中文为主；中英文使用、安装和构建文档已经齐备，应用 UI 国际化是后续很欢迎的贡献方向。项目正在走向第一次正式公开发布，因此安装反馈和真实阅读场景中的问题尤其有价值。
 
-## Contributing
+## 参与贡献
 
-Contributions are warmly welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md), keep private PDFs and credentials out of issues, and include screenshots for visual changes.
+欢迎一起把它做得更好。请从 [CONTRIBUTING.md](CONTRIBUTING.md) 开始，不要在 issue 中上传私人 PDF 或凭据，界面改动请附截图。
 
-If TransReader gives you back even ten minutes of attention during a difficult paper, it is already doing the job it was built for. ⭐
+如果译页能在一篇难论文里帮你省下哪怕十分钟的来回切换，它就已经完成了最初想做的事情。喜欢的话，欢迎点一颗 ⭐。
 
-## License
+## 开源协议
 
-TransReader source code is released under the [MIT License](LICENSE). Third-party libraries, runtimes, and models remain under their respective licenses; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+TransReader 源代码以 [MIT License](LICENSE) 发布。第三方库、运行时和模型仍使用各自许可证，详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
