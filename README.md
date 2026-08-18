@@ -31,7 +31,7 @@
 | | |
 | --- | --- |
 | **📖 原文和译文一直在一起**<br>页面、图表、脚注、标签和公式永远只隔一眼。翻译不再把你带离原文。 | **🔍 扫描 PDF 也能直接读**<br>PP-OCRv5 mobile 检测与识别通过 Paddle Inference 在 CPU 本地运行，不要求 GPU。 |
-| **🌐 你决定使用哪个模型**<br>可用 MiMo、Kimi、DeepSeek、GLM，也可添加任意 OpenAI 兼容端点；纯文本和多模态模型都支持。 | **🏠 敏感文档可以完全本地**<br>应用内一键安装 Qwen3 1.7B，llama.cpp 负责本地翻译、文献整理和阅读问答。 |
+| **🌐 你决定使用哪个模型**<br>可用 MiMo、Kimi、DeepSeek、GLM，也可添加任意 OpenAI 兼容端点；纯文本和多模态模型都支持。 | **🏠 敏感文档可以完全本地**<br>按需安装 Hy-MT2 1.8B 专业翻译模型或 Qwen3 1.7B 问答模型，llama.cpp 在本机运行。 |
 | **💬 问当前段落，不是面对空白聊天框**<br>选中译文即可解释；助手会结合选区、当前页和附近阅读上下文回答。 | **🗂️ 建一个真正记得进度的文献库**<br>PDF、进度、缩略图、OCR、译文、分类、摘要和术语都放在一起。 |
 
 ## 看看真实界面
@@ -51,13 +51,14 @@
 
 ## 下载与安装
 
-当前稳定版为 **v0.3.1**。译页只提供一个受支持的 **Windows x64 Setup 安装包**：`TransReader-vX.Y.Z-win-x64-setup.exe`。它安装到当前用户目录，不需要管理员权限，并提供开始菜单、可选桌面快捷方式、覆盖升级和标准卸载入口。v0.3.1 不再发布 Portable 便携包。
+当前稳定版为 **v0.3.2**。译页只提供一个受支持的 **Windows x64 Setup 安装包**：`TransReader-vX.Y.Z-win-x64-setup.exe`。它安装到当前用户目录，不需要管理员权限，并提供开始菜单、可选桌面快捷方式、覆盖升级和标准卸载入口。继续不发布 Portable 便携包；约 333 MB 的 OCR 运行库和模型改为首次使用时按需安装。
 
 ### 立即下载
 
-- [Windows x64 安装版](https://github.com/Xiaojing2000/TransReader/releases/latest/download/TransReader-v0.3.1-win-x64-setup.exe)
-- [SHA-256 校验文件](https://github.com/Xiaojing2000/TransReader/releases/latest/download/TransReader-v0.3.1-SHA256SUMS.txt)
-- [源代码 ZIP](https://github.com/Xiaojing2000/TransReader/archive/refs/tags/v0.3.1.zip)
+- [Windows x64 安装版](https://github.com/Xiaojing2000/TransReader/releases/latest/download/TransReader-v0.3.2-win-x64-setup.exe)
+- [OCR 离线组件包](https://github.com/Xiaojing2000/TransReader/releases/latest/download/TransReader-OCR-PP-OCRv5-mobile-win-x64.zip)
+- [SHA-256 校验文件](https://github.com/Xiaojing2000/TransReader/releases/latest/download/TransReader-v0.3.2-SHA256SUMS.txt)
+- [源代码 ZIP](https://github.com/Xiaojing2000/TransReader/archive/refs/tags/v0.3.2.zip)
 - [查看全部版本与发行说明](https://github.com/Xiaojing2000/TransReader/releases)
 
 GitHub Release 还会为每个标签自动提供 `Source code (zip)` 与 `Source code (tar.gz)`。校验文件用于确认安装包下载完整。
@@ -71,7 +72,8 @@ GitHub Release 还会为每个标签自动提供 `Source code (zip)` 与 `Source
 - Windows 10 20H1（19041）或更高版本，x64。
 - 支持 AVX 指令集的 x64 CPU。
 - 在线模式至少 8 GB 内存；本地 AI 建议 16 GB。
-- 应用安装后约需 520 MB；安装可选本地模型与运行时后另需约 1.3 GB。
+- 基础应用安装后约需 166 MB；OCR 可选组件安装后约增加 333 MB。
+- Hy-MT2 1.8B 或 Qwen3 1.7B 各约增加 1.1–1.3 GB；同时安装两者约需 2.5 GB。
 - Microsoft Edge WebView2 Runtime（Windows 11 通常自带）。
 
 ## 三分钟开始阅读
@@ -80,7 +82,8 @@ GitHub Release 还会为每个标签自动提供 `Source code (zip)` 与 `Source
 2. 打开一个 PDF。原生 PDF 和扫描 PDF 使用同一套阅读界面。
 3. 选择翻译方式：
    - **在线模式**：首次启动没有预置模型或 API Key。打开“AI 中心 → 添加模型”，选择 MiMo、Kimi、GLM、DeepSeek 模板或自定义 OpenAI 兼容地址；可检测 `/models` 列表，选择模型后再保存并测试连接。
-   - **本地模式**：打开“AI 中心 → 本地 AI”，点击安装。模型与运行时下载完成后会检查文件大小和 SHA-256。
+   - **本地模式**：打开“AI 中心 → 本地组件”，推荐安装 Hy-MT2 1.8B 用于专业翻译；如需阅读问答和文献整理，再安装 Qwen3 1.7B。所有下载都会校验大小和 SHA-256。
+   - **OCR**：首次需要识别时按提示安装，或在“本地组件”中安装、校验、重新载入、智能修复，也可导入 Release 中的离线包。
 4. 左边看原页，右边读译文；遇到值得深挖的句子，选中并提问。
 5. 长期阅读的资料可以导入文献库，让进度、OCR、译文和整理结果保留下来。
 
@@ -94,7 +97,7 @@ GitHub Release 还会为每个标签自动提供 `Source code (zip)` 与 `Source
 | 硬件 | 普通 CPU 和内存即可 | CPU 推理，建议 16 GB 内存 |
 | 费用 | 由你选择的服务商决定 | 没有按 Token 计费的 API 成本 |
 
-OCR 始终在本地运行。在线模式只把内容交给你明确选择的端点。阅读保密材料时，还应把“文献库整理”和“阅读助手”的模型来源一并设为本地。
+OCR 启用后始终在本地运行；关闭时不会启动进程，也不会自动改用在线 OCR。在线模式只把内容交给你明确选择的端点。阅读保密材料时，还应把“文献库整理”和“阅读助手”的模型来源一并设为本地。
 
 ## 它不只是逐句替换词语
 
@@ -128,7 +131,7 @@ dotnet test .\tests\TransReader.Core.Tests -c Release
 安装 Inno Setup 后可生成 Setup 安装包：
 
 ```powershell
-.\scripts\publish.ps1 -Version 0.3.1
+.\scripts\publish.ps1 -Version 0.3.2
 ```
 
 完整说明见[中文构建手册](docs/BUILDING.zh-CN.md)或 [Building TransReader from Source](docs/BUILDING.md)。

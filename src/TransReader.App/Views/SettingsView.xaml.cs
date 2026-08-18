@@ -9,6 +9,7 @@ using TransReader.App.Services;
 using TransReader.Core.Storage;
 using TransReader.Core.Translation;
 using Windows.ApplicationModel.DataTransfer;
+using Windows.Storage.Pickers;
 
 namespace TransReader.App.Views;
 
@@ -42,6 +43,7 @@ internal sealed partial class SettingsView : UserControl
     private bool _suppressEvents;
     private bool _loaded;
     private bool _subscribedToLocal;
+    private bool _subscribedToOcr;
     private UpdateRelease? _availableUpdate;
 
     public SettingsView(SettingsViewContext context)
@@ -49,7 +51,11 @@ internal sealed partial class SettingsView : UserControl
         _context = context;
         InitializeComponent();
         ProviderList.ItemsSource = _providerRows;
-        LocalModelNameText.Text = LocalAiManifest.ModelDisplayName;
+        foreach (var model in _context.LocalModels.Models)
+        {
+            LocalModelPicker.Items.Add(new ComboBoxItem { Content = model.DisplayName, Tag = model.Id });
+        }
+        LocalModelPicker.SelectedIndex = 0;
         CurrentVersionText.Text = $"当前版本：{_context.UpdateService.CurrentVersionText}";
         ApplyAvailableUpdate(_context.UpdateService.LastAvailableRelease);
         Loaded += SettingsView_Loaded;
@@ -73,7 +79,13 @@ internal sealed partial class SettingsView : UserControl
             _subscribedToLocal = true;
             _context.LocalModels.StatusChanged += LocalModels_StatusChanged;
         }
+        if (!_subscribedToOcr)
+        {
+            _subscribedToOcr = true;
+            _context.OcrComponents.StatusChanged += OcrComponents_StatusChanged;
+        }
         RefreshLocalUi(_context.LocalModels.Status);
+        RefreshOcrUi(_context.OcrComponents.Status);
         if (_loaded)
         {
             return;
@@ -86,6 +98,12 @@ internal sealed partial class SettingsView : UserControl
             try
             {
                 ModeToggle.IsOn = mode == TranslationExecutionMode.Online;
+                OcrEnabledToggle.IsOn = _context.OcrComponents.IsEnabled;
+                LocalEnabledToggle.IsOn = _context.LocalModels.IsEnabled;
+                var selectedLocalModelId = await _context.SettingsStore.LoadSelectedLocalModelIdAsync();
+                var selectedLocalModel = LocalModelCatalog.ById(selectedLocalModelId ?? string.Empty)
+                    ?? _context.LocalModels.PreferredTranslationModel;
+                SelectLocalModel(selectedLocalModel.Id);
             }
             finally
             {
@@ -107,6 +125,11 @@ internal sealed partial class SettingsView : UserControl
         {
             _subscribedToLocal = false;
             _context.LocalModels.StatusChanged -= LocalModels_StatusChanged;
+        }
+        if (_subscribedToOcr)
+        {
+            _subscribedToOcr = false;
+            _context.OcrComponents.StatusChanged -= OcrComponents_StatusChanged;
         }
     }
 
@@ -717,82 +740,333 @@ internal sealed partial class SettingsView : UserControl
         bool IsMultimodal,
         bool Reasoning);
 
-    // ---------- 本地 AI ----------
+    // ---------- 本地组件 ----------
+
+    private LocalModelDescriptor SelectedLocalModel =>
+        LocalModelCatalog.ById((LocalModelPicker.SelectedItem as ComboBoxItem)?.Tag as string ?? string.Empty)
+        ?? LocalModelCatalog.General;
+
+    private void SelectLocalModel(string modelId)
+    {
+        for (var index = 0; index < LocalModelPicker.Items.Count; index++)
+        {
+            if (LocalModelPicker.Items[index] is ComboBoxItem item &&
+                string.Equals(item.Tag?.ToString(), modelId, StringComparison.Ordinal))
+            {
+                LocalModelPicker.SelectedIndex = index;
+                return;
+            }
+        }
+        LocalModelPicker.SelectedIndex = 0;
+    }
+
+    private void OcrComponents_StatusChanged(object? sender, OcrComponentStatus status) =>
+        DispatcherQueue.TryEnqueue(() => RefreshOcrUi(status));
 
     private void LocalModels_StatusChanged(object? sender, LocalAiStatus status) =>
         DispatcherQueue.TryEnqueue(() => RefreshLocalUi(status));
 
+    private void RefreshOcrUi(OcrComponentStatus status)
+    {
+        var components = _context.OcrComponents;
+        OcrStatusText.Text = status.TotalBytes > 0
+            ? $"{status.Message}（{status.BytesReceived / 1048576d:0.#} / {status.TotalBytes / 1048576d:0.#} MB）"
+            : status.Message;
+        OcrInstallProgress.Visibility = status.State == OcrComponentState.Installing
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        OcrInstallProgress.IsIndeterminate = status.State == OcrComponentState.Installing && status.TotalBytes <= 0;
+        if (status.TotalBytes > 0) OcrInstallProgress.Value = status.Progress;
+        OcrInstalledSizeText.Text = $"已安装体积：{components.InstalledSize / 1048576d:0.#} MB";
+
+        var busy = status.State is OcrComponentState.Installing or OcrComponentState.Starting;
+        OcrInstallButton.IsEnabled = !busy;
+        OcrImportButton.IsEnabled = !busy;
+        OcrForceButton.IsEnabled = !busy;
+        OcrReloadButton.IsEnabled = !busy && components.IsEnabled && components.IsInstalled;
+        OcrVerifyButton.IsEnabled = !busy && components.IsInstalled;
+        OcrUninstallButton.IsEnabled = !busy && components.IsInstalled;
+    }
+
     private void RefreshLocalUi(LocalAiStatus status)
     {
         var localModels = _context.LocalModels;
-        var downloading = status.State == LocalAiState.Installing && status.TotalBytes > 0;
-        LocalStatusText.Text = downloading
+        var selected = SelectedLocalModel;
+        var selectedInstalled = localModels.IsModelInstalled(selected.Id);
+        LocalStatusText.Text = status.TotalBytes > 0
             ? $"{status.Message}（{status.BytesReceived / 1048576d:0.#} / {status.TotalBytes / 1048576d:0.#} MB）"
-            : status.Message;
+            : $"{selected.DisplayName}：{(selectedInstalled ? "已安装" : "未安装")} · {status.Message}";
         LocalInstallProgress.Visibility = status.State == LocalAiState.Installing
             ? Visibility.Visible
             : Visibility.Collapsed;
-        if (status.TotalBytes > 0)
-        {
-            LocalInstallProgress.IsIndeterminate = false;
-            LocalInstallProgress.Value = status.Progress;
-        }
-        else
-        {
-            LocalInstallProgress.IsIndeterminate = status.State == LocalAiState.Installing;
-        }
+        LocalInstallProgress.IsIndeterminate = status.State == LocalAiState.Installing && status.TotalBytes <= 0;
+        if (status.TotalBytes > 0) LocalInstallProgress.Value = status.Progress;
         var installedSize = localModels.InstalledSize / 1048576d;
-        LocalInstalledSizeText.Text = $"已安装体积：{installedSize:0.#} MB";
-        OverviewLocalModelText.Text = $"{LocalAiManifest.ModelDisplayName} · {status.Message} · 已安装 {installedSize:0.#} MB";
+        LocalInstalledSizeText.Text = $"全部本地模型占用：{installedSize:0.#} MB";
+        var installedNames = localModels.Models.Where(model => localModels.IsModelInstalled(model.Id))
+            .Select(model => model.DisplayName.Split('（')[0].Trim()).ToArray();
+        OverviewLocalModelText.Text = installedNames.Length == 0
+            ? $"未安装 · {status.Message}"
+            : $"{string.Join("、", installedNames)} · {status.Message} · {installedSize:0.#} MB";
 
         var busy = status.State is LocalAiState.Installing or LocalAiState.Starting;
         LocalInstallButton.IsEnabled = !busy;
-        LocalVerifyButton.IsEnabled = !busy && localModels.IsInstalled;
-        LocalUninstallButton.IsEnabled = !busy && localModels.IsInstalled;
-
+        LocalVerifyButton.IsEnabled = !busy && selectedInstalled;
+        LocalReloadButton.IsEnabled = !busy && selectedInstalled && localModels.IsEnabled;
+        LocalForceButton.IsEnabled = !busy;
+        LocalUninstallButton.IsEnabled = !busy && localModels.AnyModelInstalled;
+        LocalModelPicker.IsEnabled = !busy;
         UpdatePendingAnalysisText();
+    }
+
+    private async void OcrEnabledToggle_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_suppressEvents || !_loaded) return;
+        try
+        {
+            var enabled = OcrEnabledToggle.IsOn;
+            _context.OcrComponents.SetEnabled(enabled);
+            await _context.SettingsStore.SaveOcrEnabledAsync(enabled);
+            if (enabled && !_context.OcrComponents.IsInstalled)
+            {
+                var dialog = new ContentDialog
+                {
+                    XamlRoot = XamlRoot,
+                    Title = "安装 OCR 组件",
+                    Content = "需要下载约 112 MB。安装后页面文字识别只在本机进行。",
+                    PrimaryButtonText = "下载安装",
+                    CloseButtonText = "暂不安装",
+                    DefaultButton = ContentDialogButton.Primary
+                };
+                if (await dialog.ShowAsync() == ContentDialogResult.Primary) await InstallOcrAsync(false);
+            }
+            RaiseSettingsChanged();
+        }
+        catch (Exception ex)
+        {
+            ShowInfo(LocalInfoBar, InfoBarSeverity.Error, "OCR 状态切换失败", ex.Message);
+        }
+        finally { RefreshOcrUi(_context.OcrComponents.Status); }
+    }
+
+    private async Task InstallOcrAsync(bool force)
+    {
+        if (force) await _context.OcrComponents.ForceReinstallAsync();
+        else await _context.OcrComponents.InstallOrRepairAsync();
+        _context.OcrComponents.SetEnabled(true);
+        await _context.SettingsStore.SaveOcrEnabledAsync(true);
+        await _context.OcrEngineProvider.ReloadAsync();
+        _suppressEvents = true;
+        try { OcrEnabledToggle.IsOn = true; }
+        finally { _suppressEvents = false; }
+        RaiseSettingsChanged();
+    }
+
+    private async void OcrInstall_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            await InstallOcrAsync(false);
+            ShowInfo(LocalInfoBar, InfoBarSeverity.Success, "OCR 已就绪", _context.OcrComponents.Status.Message);
+        }
+        catch (Exception ex) { ShowInfo(LocalInfoBar, InfoBarSeverity.Error, "OCR 安装 / 修复失败", ex.Message); }
+        finally { RefreshOcrUi(_context.OcrComponents.Status); }
+    }
+
+    private async void OcrReload_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            await _context.OcrEngineProvider.ReloadAsync();
+            ShowInfo(LocalInfoBar, InfoBarSeverity.Success, "OCR 重新载入成功", "工作进程与识别冒烟检测均已通过。");
+        }
+        catch (Exception ex) { ShowInfo(LocalInfoBar, InfoBarSeverity.Error, "OCR 重新载入失败", ex.Message); }
+        finally { RefreshOcrUi(_context.OcrComponents.Status); }
+    }
+
+    private async void OcrVerify_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var valid = await _context.OcrComponents.VerifyAsync();
+            ShowInfo(LocalInfoBar, valid ? InfoBarSeverity.Success : InfoBarSeverity.Error,
+                valid ? "OCR 校验通过" : "OCR 校验失败", _context.OcrComponents.Status.Message);
+        }
+        catch (Exception ex) { ShowInfo(LocalInfoBar, InfoBarSeverity.Error, "OCR 校验失败", ex.Message); }
+        finally { RefreshOcrUi(_context.OcrComponents.Status); }
+    }
+
+    private async void OcrImport_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var picker = new FileOpenPicker { SuggestedStartLocation = PickerLocationId.Downloads };
+            picker.FileTypeFilter.Add(".zip");
+            WinRT.Interop.InitializeWithWindow.Initialize(picker, _context.WindowHandle);
+            var file = await picker.PickSingleFileAsync();
+            if (file is null) return;
+            await _context.OcrComponents.ImportAsync(file.Path);
+            _context.OcrComponents.SetEnabled(true);
+            await _context.SettingsStore.SaveOcrEnabledAsync(true);
+            await _context.OcrEngineProvider.ReloadAsync();
+            _suppressEvents = true;
+            try { OcrEnabledToggle.IsOn = true; }
+            finally { _suppressEvents = false; }
+            RaiseSettingsChanged();
+            ShowInfo(LocalInfoBar, InfoBarSeverity.Success, "离线组件导入成功", "OCR 已校验并重新载入。");
+        }
+        catch (Exception ex) { ShowInfo(LocalInfoBar, InfoBarSeverity.Error, "离线组件导入失败", ex.Message); }
+        finally { RefreshOcrUi(_context.OcrComponents.Status); }
+    }
+
+    private async void OcrForce_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = "强制重新安装 OCR",
+            Content = "将清理组件和下载缓存，再完整下载并校验。原组件会在新组件安装成功前保留。",
+            PrimaryButtonText = "重新安装",
+            CloseButtonText = "取消",
+            DefaultButton = ContentDialogButton.Close
+        };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        try
+        {
+            await InstallOcrAsync(true);
+            ShowInfo(LocalInfoBar, InfoBarSeverity.Success, "OCR 已重新安装", _context.OcrComponents.Status.Message);
+        }
+        catch (Exception ex) { ShowInfo(LocalInfoBar, InfoBarSeverity.Error, "OCR 重新安装失败", ex.Message); }
+        finally { RefreshOcrUi(_context.OcrComponents.Status); }
+    }
+
+    private async void OcrUninstall_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = "卸载 OCR 组件",
+            Content = "将删除已下载的 OCR 运行库和模型，不影响应用与在线模型配置。",
+            PrimaryButtonText = "卸载",
+            CloseButtonText = "取消",
+            DefaultButton = ContentDialogButton.Close
+        };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        try
+        {
+            await _context.OcrComponents.UninstallAsync();
+            await _context.SettingsStore.SaveOcrEnabledAsync(false);
+            _suppressEvents = true;
+            try { OcrEnabledToggle.IsOn = false; }
+            finally { _suppressEvents = false; }
+            RaiseSettingsChanged();
+            ShowInfo(LocalInfoBar, InfoBarSeverity.Success, "OCR 已卸载", "需要时可重新安装。");
+        }
+        catch (Exception ex) { ShowInfo(LocalInfoBar, InfoBarSeverity.Error, "OCR 卸载失败", ex.Message); }
+        finally { RefreshOcrUi(_context.OcrComponents.Status); }
+    }
+
+    private async void LocalEnabledToggle_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_suppressEvents || !_loaded) return;
+        try
+        {
+            var enabled = LocalEnabledToggle.IsOn;
+            _context.LocalModels.SetEnabled(enabled);
+            await _context.SettingsStore.SaveLocalAiEnabledAsync(enabled);
+            if (enabled && !_context.LocalModels.IsModelInstalled(SelectedLocalModel.Id))
+            {
+                ShowInfo(LocalInfoBar, InfoBarSeverity.Informational, "尚未安装所选模型", "点击“安装”后才会下载，不会自动调用在线 API。");
+            }
+            RaiseSettingsChanged();
+        }
+        catch (Exception ex) { ShowInfo(LocalInfoBar, InfoBarSeverity.Error, "本地大模型状态切换失败", ex.Message); }
+        finally { RefreshLocalUi(_context.LocalModels.Status); }
+    }
+
+    private async void LocalModelPicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (LocalStatusText is null) return;
+        RefreshLocalUi(_context.LocalModels.Status);
+        if (_suppressEvents || !_loaded) return;
+        try
+        {
+            await _context.SettingsStore.SaveSelectedLocalModelIdAsync(SelectedLocalModel.Id);
+        }
+        catch (Exception ex)
+        {
+            ShowInfo(LocalInfoBar, InfoBarSeverity.Error, "无法保存本地模型选择", ex.Message);
+        }
+    }
+
+    private async Task InstallLocalModelAsync(bool force)
+    {
+        var selected = SelectedLocalModel;
+        await _context.LocalModels.InstallAsync(selected.Id, force);
+        _context.LocalModels.SetEnabled(true);
+        await _context.SettingsStore.SaveLocalAiEnabledAsync(true);
+        _suppressEvents = true;
+        try { LocalEnabledToggle.IsOn = true; }
+        finally { _suppressEvents = false; }
+        if (selected.Purpose == LocalModelPurpose.General) await _context.EnqueuePendingAnalysesAsync();
+        RaiseSettingsChanged();
     }
 
     private async void LocalInstall_Click(object sender, RoutedEventArgs e)
     {
-        LocalInstallButton.IsEnabled = false;
         try
         {
-            await _context.LocalModels.InstallAsync();
-            await _context.EnqueuePendingAnalysesAsync();
-            UpdatePendingAnalysisText();
+            await InstallLocalModelAsync(false);
             ShowInfo(LocalInfoBar, InfoBarSeverity.Success, "安装完成", _context.LocalModels.Status.Message);
         }
-        catch (OperationCanceledException)
-        {
-            // 用户取消：状态机已回落到 未安装/已安装，无需提示。
-        }
-        catch (Exception ex)
-        {
-            ShowInfo(LocalInfoBar, InfoBarSeverity.Error, "本地 AI 安装失败", ex.Message);
-        }
-        finally
-        {
-            RefreshLocalUi(_context.LocalModels.Status);
-        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex) { ShowInfo(LocalInfoBar, InfoBarSeverity.Error, "本地模型安装失败", ex.Message); }
+        finally { RefreshLocalUi(_context.LocalModels.Status); }
     }
 
     private async void LocalVerify_Click(object sender, RoutedEventArgs e)
     {
         try
         {
-            var valid = await _context.LocalModels.VerifyAsync();
+            var valid = await _context.LocalModels.VerifyAsync(SelectedLocalModel.Id);
             ShowInfo(LocalInfoBar, valid ? InfoBarSeverity.Success : InfoBarSeverity.Error,
                 valid ? "校验通过" : "校验失败", _context.LocalModels.Status.Message);
         }
-        catch (Exception ex)
+        catch (Exception ex) { ShowInfo(LocalInfoBar, InfoBarSeverity.Error, "校验失败", ex.Message); }
+        finally { RefreshLocalUi(_context.LocalModels.Status); }
+    }
+
+    private async void LocalReload_Click(object sender, RoutedEventArgs e)
+    {
+        try
         {
-            ShowInfo(LocalInfoBar, InfoBarSeverity.Error, "校验失败", ex.Message);
+            await _context.LocalModels.ReloadAsync(SelectedLocalModel.Purpose);
+            ShowInfo(LocalInfoBar, InfoBarSeverity.Success, "本地模型已重新载入", "模型文件校验和 /models 健康检查均已通过。");
         }
-        finally
+        catch (Exception ex) { ShowInfo(LocalInfoBar, InfoBarSeverity.Error, "本地模型重新载入失败", ex.Message); }
+        finally { RefreshLocalUi(_context.LocalModels.Status); }
+    }
+
+    private async void LocalForce_Click(object sender, RoutedEventArgs e)
+    {
+        var selected = SelectedLocalModel;
+        var dialog = new ContentDialog
         {
-            RefreshLocalUi(_context.LocalModels.Status);
+            XamlRoot = XamlRoot,
+            Title = $"重新安装 {selected.DisplayName}",
+            Content = "将清理该模型的下载缓存并完整重新下载，流量约 1.1–1.3 GB。",
+            PrimaryButtonText = "重新安装",
+            CloseButtonText = "取消",
+            DefaultButton = ContentDialogButton.Close
+        };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        try
+        {
+            await InstallLocalModelAsync(true);
+            ShowInfo(LocalInfoBar, InfoBarSeverity.Success, "模型已重新安装", _context.LocalModels.Status.Message);
         }
+        catch (Exception ex) { ShowInfo(LocalInfoBar, InfoBarSeverity.Error, "模型重新安装失败", ex.Message); }
+        finally { RefreshLocalUi(_context.LocalModels.Status); }
     }
 
     private async void LocalUninstall_Click(object sender, RoutedEventArgs e)
@@ -800,29 +1074,25 @@ internal sealed partial class SettingsView : UserControl
         var dialog = new ContentDialog
         {
             XamlRoot = XamlRoot,
-            Title = "卸载本地模型",
-            Content = "将删除本地模型与推理运行时（约 1.3 GB），之后可重新安装。确定卸载吗？",
+            Title = "卸载全部本地模型",
+            Content = "将删除 Qwen、HY-MT 和本地推理运行时，之后仍可按需重新安装。",
             PrimaryButtonText = "卸载",
             CloseButtonText = "取消",
             DefaultButton = ContentDialogButton.Close
         };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
         try
         {
-            if (await dialog.ShowAsync() != ContentDialogResult.Primary)
-            {
-                return;
-            }
             await _context.LocalModels.UninstallAsync();
+            await _context.SettingsStore.SaveLocalAiEnabledAsync(false);
+            _suppressEvents = true;
+            try { LocalEnabledToggle.IsOn = false; }
+            finally { _suppressEvents = false; }
+            RaiseSettingsChanged();
             ShowInfo(LocalInfoBar, InfoBarSeverity.Success, "已卸载", _context.LocalModels.Status.Message);
         }
-        catch (Exception ex)
-        {
-            ShowInfo(LocalInfoBar, InfoBarSeverity.Error, "卸载失败", ex.Message);
-        }
-        finally
-        {
-            RefreshLocalUi(_context.LocalModels.Status);
-        }
+        catch (Exception ex) { ShowInfo(LocalInfoBar, InfoBarSeverity.Error, "卸载失败", ex.Message); }
+        finally { RefreshLocalUi(_context.LocalModels.Status); }
     }
 
     // ---------- AI 能力 ----------
@@ -1197,7 +1467,9 @@ internal sealed partial class SettingsView : UserControl
     {
         var pending = _context.GetPendingAnalysisCount();
         PendingAnalysisText.Text = pending > 0
-            ? $"当前有 {pending} 篇文献等待分析。"
+            ? !_context.OcrComponents.IsEnabled || !_context.OcrComponents.IsInstalled
+                ? $"当前有 {pending} 篇文献暂停等待 OCR 组件；启用并安装后会继续。"
+                : $"当前有 {pending} 篇文献等待分析。"
             : "当前没有等待分析的文献。";
         // 安装引导仅在来源为本地且未安装时显示；在线来源不依赖本地模型。
         InstallLocalModelLink.Visibility = _libraryAnalysisSource == "local" && !_context.LocalModels.IsInstalled

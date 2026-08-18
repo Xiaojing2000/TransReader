@@ -12,16 +12,22 @@ namespace TransReader.App.Services;
 /// </summary>
 internal static class AppLog
 {
-    private static readonly string LogDirectory = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "TransReader",
-        "logs");
+    private static readonly string LogDirectory = ResolveLogDirectory();
     private static readonly string LogPath = Path.Combine(LogDirectory, "app.log");
     private static readonly string CrashPath = Path.Combine(LogDirectory, "crashes.log");
     private static readonly string AppVersion =
         Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.0.0";
     private const long LogCapBytes = 1_000_000;
     private const long CrashCapBytes = 2_000_000;
+
+    private static string ResolveLogDirectory()
+    {
+        var testRoot = Environment.GetEnvironmentVariable("TRANSREADER_DATA_ROOT");
+        var root = string.IsNullOrWhiteSpace(testRoot)
+            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TransReader")
+            : Path.GetFullPath(testRoot);
+        return Path.Combine(root, "logs");
+    }
 
     private sealed record LogEntry(string Path, long CapBytes, string Text);
 

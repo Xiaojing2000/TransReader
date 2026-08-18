@@ -5,47 +5,46 @@ using System.Text.Json;
 
 namespace TransReader.Core.Ocr;
 
+/// <summary>Absolute locations for one verified OCR component installation.</summary>
+public sealed record OcrRuntimePaths(
+    string HostPath,
+    string ModelDirectory,
+    string PipelineConfigPath);
+
 /// <summary>
 /// OCR engine running in a dedicated worker process (TransOcrNative.Host.exe).
-/// The vendored PaddleOCR pipeline can terminate its own process on internal
-/// errors (exit/abort/fail-fast); out here that only kills the worker, and the
-/// caller can simply create a new engine instance to recover.
+/// Native failures are isolated to the worker and reported with a bounded tail
+/// of its stderr output.
 /// </summary>
 public sealed class ProcessOcrEngine : IOcrEngine
 {
     private const int ExitInterceptedStatus = -1;
+    private const int NativeLogLineLimit = 80;
 
-    /// <summary>工作者进程死亡/协议损坏/初始化失败时的统一 Status（负值）。
-    /// 宿主原生状态码（&gt;0）表示单张图像识别失败，引擎本身仍健康。</summary>
     public const int WorkerDeadStatus = ExitInterceptedStatus;
 
-    /// <summary>OCR 引擎/模型版本标识。升级 PaddleOCR 模型后改它，旧 OCR 缓存即按版本失效重算。</summary>
-    public const string EngineVersion = "paddleocr-ppocrv5-mobile-cpu-v1";
+    /// <summary>Cache identity. v2 also pins an explicit PaddleOCR pipeline config.</summary>
+    public const string EngineVersion = "paddleocr-ppocrv5-mobile-cpu-v2";
 
     private readonly object _gate = new();
+    private readonly object _logGate = new();
+    private readonly Queue<string> _stderrLines = new();
     private readonly Process _process;
     private readonly Stream _input;
     private readonly AnonymousPipeServerStream _responsePipe;
     private readonly Stream _output;
+    private readonly Task _stdoutDrainTask;
+    private readonly Task _stderrDrainTask;
     private bool _disposed;
 
-    public ProcessOcrEngine(string modelDirectory, int threads = 8)
+    private ProcessOcrEngine(OcrRuntimePaths paths, int threads)
     {
-        var hostPath = Path.Combine(AppContext.BaseDirectory, "TransOcrNative.Host.exe");
-        if (!File.Exists(hostPath))
-        {
-            throw new NativeOcrException(ExitInterceptedStatus,
-                $"未找到 OCR 工作者进程：{hostPath}");
-        }
-
-        // Response frames travel over a dedicated anonymous pipe whose handle the
-        // worker inherits. Its stdout is left to the vendored Paddle logging
-        // (fprintf(stdout, ...)), so a log flush can never corrupt a frame.
+        ValidatePaths(paths);
         _responsePipe = new AnonymousPipeServerStream(PipeDirection.In, HandleInheritability.Inheritable);
-
         var startInfo = new ProcessStartInfo
         {
-            FileName = hostPath,
+            FileName = paths.HostPath,
+            WorkingDirectory = Path.GetDirectoryName(paths.HostPath)!,
             UseShellExecute = false,
             RedirectStandardInput = true,
             RedirectStandardOutput = true,
@@ -53,7 +52,8 @@ public sealed class ProcessOcrEngine : IOcrEngine
             CreateNoWindow = true
         };
         startInfo.ArgumentList.Add(_responsePipe.GetClientHandleAsString());
-        startInfo.ArgumentList.Add(modelDirectory);
+        startInfo.ArgumentList.Add(paths.ModelDirectory);
+        startInfo.ArgumentList.Add(paths.PipelineConfigPath);
         startInfo.ArgumentList.Add(threads.ToString());
 
         try
@@ -66,34 +66,55 @@ public sealed class ProcessOcrEngine : IOcrEngine
             _responsePipe.Dispose();
             throw;
         }
+
         _responsePipe.DisposeLocalCopyOfClientHandle();
         _input = _process.StandardInput.BaseStream;
         _output = _responsePipe;
+        _stdoutDrainTask = DrainOutputAsync(_process.StandardOutput, keepTail: false);
+        _stderrDrainTask = DrainOutputAsync(_process.StandardError, keepTail: true);
+    }
 
-        // stdout now carries native logs only. It must be drained continuously —
-        // otherwise a full pipe buffer would block the worker — but the content
-        // itself is discarded (AppLog lives in the App layer, not in Core).
-        _ = Task.Run(async () =>
+    /// <summary>Starts the worker and waits for native model initialization.</summary>
+    public static async Task<ProcessOcrEngine> CreateAsync(
+        OcrRuntimePaths paths,
+        int threads = 8,
+        TimeSpan? startupTimeout = null,
+        CancellationToken cancellationToken = default)
+    {
+        var engine = new ProcessOcrEngine(paths, threads);
+        try
         {
-            try
+            var ready = await engine.ReadExactAsync(4, cancellationToken)
+                .WaitAsync(startupTimeout ?? TimeSpan.FromSeconds(60), cancellationToken)
+                .ConfigureAwait(false);
+            if (ready is null || BitConverter.ToInt32(ready) != 0)
             {
-                while (await _process.StandardOutput.ReadLineAsync() is not null)
-                {
-                }
+                await engine.WaitForDiagnosticsAsync().ConfigureAwait(false);
+                throw engine.InitializationException("OCR 工作者进程未返回就绪信号。");
             }
-            catch
-            {
-            }
-        });
-
-        // The host writes one int32 (0) once the native models are loaded.
-        var ready = ReadExact(4);
-        if (ready is null || BitConverter.ToInt32(ready) != 0)
+            return engine;
+        }
+        catch (TimeoutException ex)
         {
-            var stderr = ReadStderrSafe();
-            _responsePipe.Dispose();
-            throw new NativeOcrException(ExitInterceptedStatus,
-                $"OCR 工作者进程初始化失败。{stderr}");
+            var wrapped = engine.InitializationException("OCR 初始化超过 60 秒，已停止工作进程。", ex);
+            engine.Dispose();
+            throw wrapped;
+        }
+        catch (OperationCanceledException)
+        {
+            engine.Dispose();
+            throw;
+        }
+        catch (NativeOcrException)
+        {
+            engine.Dispose();
+            throw;
+        }
+        catch (Exception ex)
+        {
+            var wrapped = engine.InitializationException("OCR 工作者进程初始化失败。", ex);
+            engine.Dispose();
+            throw wrapped;
         }
     }
 
@@ -102,10 +123,7 @@ public sealed class ProcessOcrEngine : IOcrEngine
         ObjectDisposedException.ThrowIf(_disposed, this);
         lock (_gate)
         {
-            if (_process.HasExited)
-            {
-                throw WorkerDeadException();
-            }
+            if (_process.HasExited) throw WorkerDeadException();
 
             Span<byte> header = stackalloc byte[20];
             BitConverter.TryWriteBytes(header, width);
@@ -119,66 +137,66 @@ public sealed class ProcessOcrEngine : IOcrEngine
                 _input.Flush();
 
                 var responseHeader = ReadExact(12);
-                if (responseHeader is null)
-                {
-                    throw WorkerDeadException();
-                }
+                if (responseHeader is null) throw WorkerDeadException();
                 var status = BitConverter.ToInt32(responseHeader);
                 var payloadLength = BitConverter.ToUInt64(responseHeader.AsSpan(4));
                 if (payloadLength > (64UL << 20))
-                {
                     throw WorkerDeadException("OCR 工作者进程返回了非法数据帧。");
-                }
-                var payload = ReadExact((int)payloadLength)
-                    ?? throw WorkerDeadException();
+                var payload = ReadExact((int)payloadLength) ?? throw WorkerDeadException();
                 var payloadText = Encoding.UTF8.GetString(payload);
-                if (status != 0)
-                {
-                    throw new NativeOcrException(status, payloadText);
-                }
+                if (status != 0) throw new NativeOcrException(status, payloadText);
                 var page = JsonSerializer.Deserialize<OcrPage>(payloadText)
                     ?? throw new NativeOcrException(status, "OCR 工作者进程返回了无效 JSON。");
                 return page with { EngineVersion = EngineVersion };
             }
-            catch (IOException)
-            {
-                throw WorkerDeadException();
-            }
-            catch (ObjectDisposedException)
-            {
-                throw WorkerDeadException();
-            }
+            catch (IOException) { throw WorkerDeadException(); }
+            catch (ObjectDisposedException) { throw WorkerDeadException(); }
         }
     }
 
     public void Dispose()
     {
-        if (_disposed)
-        {
-            return;
-        }
+        if (_disposed) return;
         _disposed = true;
         try
         {
-            _input.Dispose(); // Closing stdin makes the host exit its loop.
-            if (!_process.WaitForExit(2000))
-            {
-                _process.Kill(entireProcessTree: true);
-            }
+            _input.Dispose();
+            if (!_process.WaitForExit(2000)) _process.Kill(entireProcessTree: true);
         }
         catch
         {
-            try
-            {
-                _process.Kill(entireProcessTree: true);
-            }
-            catch
-            {
-            }
+            try { _process.Kill(entireProcessTree: true); } catch { }
         }
         _responsePipe.Dispose();
         _process.Dispose();
         GC.SuppressFinalize(this);
+    }
+
+    private static void ValidatePaths(OcrRuntimePaths paths)
+    {
+        if (!File.Exists(paths.HostPath))
+            throw new NativeOcrException(ExitInterceptedStatus, $"未找到 OCR 工作者进程：{paths.HostPath}");
+        if (!Directory.Exists(paths.ModelDirectory))
+            throw new NativeOcrException(ExitInterceptedStatus, $"未找到 OCR 模型目录：{paths.ModelDirectory}");
+        if (!File.Exists(paths.PipelineConfigPath))
+            throw new NativeOcrException(ExitInterceptedStatus, $"未找到 OCR 配置文件：{paths.PipelineConfigPath}");
+    }
+
+    private async Task DrainOutputAsync(StreamReader reader, bool keepTail)
+    {
+        try
+        {
+            while (await reader.ReadLineAsync().ConfigureAwait(false) is { } line)
+            {
+                if (!keepTail || string.IsNullOrWhiteSpace(line)) continue;
+                lock (_logGate)
+                {
+                    _stderrLines.Enqueue(line);
+                    while (_stderrLines.Count > NativeLogLineLimit) _stderrLines.Dequeue();
+                }
+            }
+        }
+        catch { }
     }
 
     private byte[]? ReadExact(int count)
@@ -188,60 +206,69 @@ public sealed class ProcessOcrEngine : IOcrEngine
         while (offset < count)
         {
             int read;
-            try
-            {
-                read = _output.Read(buffer, offset, count - offset);
-            }
-            catch (IOException)
-            {
-                return null;
-            }
-            catch (ObjectDisposedException)
-            {
-                return null;
-            }
-            if (read == 0)
-            {
-                return null; // EOF: worker exited.
-            }
+            try { read = _output.Read(buffer, offset, count - offset); }
+            catch (IOException) { return null; }
+            catch (ObjectDisposedException) { return null; }
+            if (read == 0) return null;
             offset += read;
         }
         return buffer;
     }
 
-    private string ReadStderrSafe()
+    private async Task<byte[]?> ReadExactAsync(int count, CancellationToken cancellationToken)
+    {
+        var buffer = new byte[count];
+        var offset = 0;
+        while (offset < count)
+        {
+            int read;
+            try
+            {
+                read = await _output.ReadAsync(buffer.AsMemory(offset, count - offset), cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch (IOException) { return null; }
+            catch (ObjectDisposedException) { return null; }
+            if (read == 0) return null;
+            offset += read;
+        }
+        return buffer;
+    }
+
+    private string StderrTail()
+    {
+        lock (_logGate) return string.Join(Environment.NewLine, _stderrLines);
+    }
+
+    private async Task WaitForDiagnosticsAsync()
     {
         try
         {
-            if (_process.WaitForExit(3000))
-            {
-                return _process.StandardError.ReadToEnd();
-            }
-            _process.Kill(entireProcessTree: true);
+            if (!_process.HasExited)
+                await _process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
         }
-        catch
-        {
-        }
-        return string.Empty;
+        catch { }
+        try { await _stderrDrainTask.WaitAsync(TimeSpan.FromSeconds(1)).ConfigureAwait(false); }
+        catch { }
+    }
+
+    private NativeOcrException InitializationException(string detail, Exception? inner = null)
+    {
+        var stderr = StderrTail();
+        var exit = _process.HasExited ? $"退出码 0x{_process.ExitCode:X8}" : "进程未就绪";
+        var message = $"{detail}（{exit}）" +
+            (string.IsNullOrWhiteSpace(stderr) ? string.Empty : $"\n原生输出：{stderr}") +
+            (inner is null ? string.Empty : $"\n{inner.Message}");
+        return new NativeOcrException(ExitInterceptedStatus, message);
     }
 
     private NativeOcrException WorkerDeadException(string? detail = null)
     {
         var exitInfo = _process.HasExited ? $"退出码 0x{_process.ExitCode:X8}" : "进程无响应";
-        var stderr = string.Empty;
-        if (_process.HasExited)
-        {
-            try
-            {
-                stderr = _process.StandardError.ReadToEnd();
-            }
-            catch
-            {
-            }
-        }
+        var stderr = StderrTail();
         var message = $"OCR 工作者进程已终止（{exitInfo}）。" +
             (string.IsNullOrWhiteSpace(detail) ? string.Empty : detail) +
-            (string.IsNullOrWhiteSpace(stderr) ? string.Empty : $"\n原生输出：{stderr.Trim()}");
+            (string.IsNullOrWhiteSpace(stderr) ? string.Empty : $"\n原生输出：{stderr}");
         return new NativeOcrException(ExitInterceptedStatus, message);
     }
 }

@@ -34,6 +34,7 @@ public sealed partial class MainWindow : Window
     private readonly MarkdownReaderController _markdownReader;
     private readonly ReaderAssistantService _readerAssistant;
     private readonly OcrCoordinator _ocrCoordinator;
+    private readonly OcrComponentManager _ocrComponents;
     private readonly LocalModelManager _localModels;
     private readonly LocalTextTranslationService _localTranslator;
     private readonly TranslationUsageStore _translationUsage;
@@ -58,7 +59,7 @@ public sealed partial class MainWindow : Window
         Interval = TimeSpan.FromMilliseconds(1500)
     };
     private uint? _pendingProgressPageIndex;
-    private readonly OcrEngineProvider _ocrEngineProvider = new();
+    private readonly OcrEngineProvider _ocrEngineProvider;
     private TranslationProfile _onlineProfile = TranslationProfile.Unconfigured;
     private TranslationExecutionMode _translationMode = TranslationExecutionMode.Online;
     private string _assistantModelSource = "follow";
@@ -102,6 +103,7 @@ public sealed partial class MainWindow : Window
     // still constructing the visual tree. Services are assigned only after
     // InitializeComponent returns, so handlers must not enter runtime logic yet.
     private bool _isInitializing = true;
+    private bool _ocrInstallPromptOpen;
 
     private TranslationProfile ActiveTranslationProfile => _translationMode == TranslationExecutionMode.Online
         ? _onlineProfile
@@ -157,6 +159,9 @@ public sealed partial class MainWindow : Window
         _windowStateStore = new WindowStateStore(Path.Combine(localRoot, "window-state.json"));
         _localModels = new LocalModelManager(Path.Combine(localRoot, "local-ai"));
         _localModels.StatusChanged += LocalModels_StatusChanged;
+        _ocrComponents = new OcrComponentManager(Path.Combine(localRoot, "ocr"));
+        _ocrComponents.StatusChanged += OcrComponents_StatusChanged;
+        _ocrEngineProvider = new OcrEngineProvider(_ocrComponents);
         _ocrCoordinator = new OcrCoordinator(_ocrEngineProvider);
         var translator = new OpenAiCompatibleTranslator();
         _localTranslator = new LocalTextTranslationService(_localModels, translator);
@@ -166,7 +171,7 @@ public sealed partial class MainWindow : Window
         _libraryIngestion = new LibraryIngestionService(libraryRoot, _libraryRepository);
         _libraryQuery = new LibraryQueryService(_libraryRepository);
         _libraryClassification = new LibraryClassificationService(
-            new PageOcrCache(Path.Combine(_cacheRoot, "ocr")), _ocrCoordinator, _localModels, translator);
+            new PageOcrCache(Path.Combine(_cacheRoot, "ocr")), _ocrCoordinator, _ocrComponents, _localModels, translator);
         _libraryClassification.ResolveOnlineProfileAsync = ResolveLibraryAnalysisProfileAsync;
         _libraryMigration = new LibraryMigrationService(_libraryRepository, _libraryIngestion);
         _libraryAnalysisOrchestrator = new LibraryAnalysisOrchestrator(_libraryRepository, _libraryClassification);
@@ -190,7 +195,6 @@ public sealed partial class MainWindow : Window
             _translationUsage);
         _readerAssistant = new ReaderAssistantService(
             new ReaderAssistantHistoryStore(Path.Combine(_cacheRoot, "assistant")), translator);
-        _ = _ocrEngineProvider.WarmupAsync();
         _ = SweepCachesAsync();
 
         ThumbnailList.ItemsSource = _thumbnailItems;
@@ -203,7 +207,6 @@ public sealed partial class MainWindow : Window
         _isInitializing = false;
         ApplyReaderLayout(RootGrid.ActualWidth);
         _ = InitializeSettingsAsync();
-        _ = ObserveOcrWarmupAsync();
         _ = CheckForUpdatesOnStartupAsync();
     }
 
@@ -314,6 +317,7 @@ public sealed partial class MainWindow : Window
         _processing.Dispose();
         _libraryAnalysisQueue.Dispose();
         _localModels.Dispose();
+        _ocrComponents.StatusChanged -= OcrComponents_StatusChanged;
         _ocrCoordinator.Dispose();
         _assistantWork?.Cancel();
         _assistantWork?.Dispose();
@@ -321,6 +325,7 @@ public sealed partial class MainWindow : Window
         _markdownReader.Dispose();
         _ = AppLog.ShutdownAsync();
         _ocrEngineProvider.Dispose();
+        _ocrComponents.Dispose();
     }
 
     private async Task InitializeMarkdownReaderAsync()
@@ -361,6 +366,16 @@ public sealed partial class MainWindow : Window
 
     private async Task ObserveOcrWarmupAsync()
     {
+        if (!_ocrComponents.IsEnabled)
+        {
+            EngineText.Text = "OCR 已关闭";
+            return;
+        }
+        if (!_ocrComponents.IsInstalled)
+        {
+            EngineText.Text = "OCR 未安装";
+            return;
+        }
         try
         {
             EngineText.Text = "PaddleOCR · 预热中";
@@ -379,6 +394,8 @@ public sealed partial class MainWindow : Window
         try
         {
             await ReloadSettingsAsync();
+            await RunComponentAcceptanceIfRequestedAsync();
+            await ObserveOcrWarmupAsync();
             // Diagnostic launches can exercise long-PDF navigation without making
             // a real API request or altering the user's saved settings.
             if (Environment.GetEnvironmentVariable("TRANSREADER_DISABLE_TRANSLATION") == "1")
@@ -1348,10 +1365,13 @@ public sealed partial class MainWindow : Window
             var view = new Views.SettingsView(new Views.SettingsViewContext(
                 _settingsStore,
                 _localModels,
+                _ocrComponents,
+                _ocrEngineProvider,
                 _translationUsage,
                 GetPendingAnalysisCount,
                 EnqueuePendingLibraryAnalysesAsync,
                 _updateService,
+                WinRT.Interop.WindowNative.GetWindowHandle(this),
                 Close));
             view.CloseRequested += (_, _) => ShowSettingsView(false);
             view.SettingsChanged += async (_, _) => await OnSettingsChangedAsync();
@@ -1423,6 +1443,22 @@ public sealed partial class MainWindow : Window
 
     private async Task ReloadSettingsAsync()
     {
+        var ocrEnabled = await _settingsStore.LoadOcrEnabledAsync();
+        if (ocrEnabled is null)
+        {
+            ocrEnabled = await _ocrComponents.TryMigrateLegacyAsync();
+            await _settingsStore.SaveOcrEnabledAsync(ocrEnabled.Value);
+        }
+        _ocrComponents.SetEnabled(ocrEnabled.Value);
+
+        var localAiEnabled = await _settingsStore.LoadLocalAiEnabledAsync();
+        if (localAiEnabled is null)
+        {
+            localAiEnabled = _localModels.AnyModelInstalled;
+            await _settingsStore.SaveLocalAiEnabledAsync(localAiEnabled.Value);
+        }
+        _localModels.SetEnabled(localAiEnabled.Value);
+
         _onlineProfile = await _settingsStore.LoadAsync();
         _translationMode = await _settingsStore.LoadExecutionModeAsync();
         _processing.PrefetchTranslationEnabled = await _settingsStore.LoadPrefetchTranslationAsync();
@@ -1475,17 +1511,17 @@ public sealed partial class MainWindow : Window
     {
         var local = _translationMode == TranslationExecutionMode.Local;
         var credentialStoreDown = !local && !_onlineProfile.IsConfigured && !_onlineProfile.IsCredentialStoreAvailable;
-        ApiHintBar.IsOpen = local ? !_localModels.IsInstalled : !_onlineProfile.IsConfigured;
+        ApiHintBar.IsOpen = local ? !_localModels.IsTranslationModelInstalled : !_onlineProfile.IsConfigured;
         ApiHintBar.Title = local ? "本地 AI 尚未安装"
             : credentialStoreDown ? "Windows 凭据库不可用"
             : "尚未配置翻译模型";
         ApiHintBar.Message = local
-            ? "本地模式不会上传页面。请安装 Qwen3 1.7B 后重新翻译。"
+            ? "本地模式不会上传页面。请安装 Hy-MT2 1.8B（推荐）或 Qwen3 1.7B 后重新翻译。"
             : credentialStoreDown
                 ? "无法读取已保存的 API Key。请重启应用后重试，或在设置中重新输入 API Key。"
                 : "配置在线模型后，识别完成会自动翻译当前页。";
         ModelStatusText.Text = local
-            ? $"本地 · Qwen3 1.7B · {_localModels.Status.Message}"
+            ? $"本地 · {_localModels.PreferredTranslationModel.DisplayName} · {_localModels.Status.Message}"
             : _onlineProfile.IsConfigured
                 ? $"{_onlineProfile.DisplayName} · {(_onlineProfile.IsMultimodal ? "多模态" : "纯文本")}"
                 : "未配置在线模型";
@@ -1528,6 +1564,22 @@ public sealed partial class MainWindow : Window
 
     private void LocalModels_StatusChanged(object? sender, LocalAiStatus status) =>
         DispatcherQueue.TryEnqueue(UpdateTranslationConfigurationUi);
+
+    private void OcrComponents_StatusChanged(object? sender, OcrComponentStatus status) =>
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            EngineText.Text = !_ocrComponents.IsEnabled
+                ? "OCR 已关闭"
+                : status.State switch
+                {
+                    OcrComponentState.NotInstalled => "OCR 未安装",
+                    OcrComponentState.Installing => "OCR 组件处理中",
+                    OcrComponentState.Starting => "PaddleOCR · 预热中",
+                    OcrComponentState.Ready => "PaddleOCR · oneDNN",
+                    OcrComponentState.Error => "OCR 初始化失败",
+                    _ => "OCR 已安装"
+                };
+        });
 
 
     private async Task EnqueuePendingLibraryAnalysesAsync()
@@ -2330,15 +2382,15 @@ public sealed partial class MainWindow : Window
 
             var translationProfile = ActiveTranslationProfile;
             var localTranslation = _translationMode == TranslationExecutionMode.Local;
-            var translationReady = localTranslation ? _localModels.IsInstalled : translationProfile.IsConfigured;
+            var translationReady = localTranslation ? _localModels.IsTranslationModelInstalled : translationProfile.IsConfigured;
             ShowTranslationMessage(translationReady
-                ? localTranslation ? "正在进行本地 OCR，随后由本地 Qwen3 翻译…" : "正在同时进行快速初译和本地 OCR…"
+                ? localTranslation ? $"正在进行本地 OCR，随后由 {_localModels.PreferredTranslationModel.DisplayName} 翻译…" : "正在同时进行快速初译和本地 OCR…"
                 : "正在进行本地文字识别…");
             SourceMetaText.Text = "正在识别…";
             SourceBlocksList.ItemsSource = null;
             SourceEmptyText.Visibility = Visibility.Collapsed;
             StatusText.Text = translationReady
-                ? localTranslation ? "正在运行本地 PaddleOCR 与 Qwen3 1.7B…" : $"正在调用 {translationProfile.Settings.Model}，同时运行 PaddleOCR…"
+                ? localTranslation ? $"正在运行本地 PaddleOCR 与 {_localModels.PreferredTranslationModel.DisplayName}…" : $"正在调用 {translationProfile.Settings.Model}，同时运行 PaddleOCR…"
                 : "正在调用 PaddleOCR CPU 引擎…";
             SetTranslationState(translationReady ? localTranslation ? "本地 OCR" : "快速初译" : "OCR 识别中",
                 TranslationVisualState.Working);
@@ -2370,7 +2422,7 @@ public sealed partial class MainWindow : Window
             {
                 data = await _processing.GetPageDataAsync(pageIndex, cancellationToken);
             }
-            catch (Exception ex) when (ex is NativeOcrException or DllNotFoundException)
+            catch (Exception ex) when (ex is NativeOcrException or DllNotFoundException or OcrComponentUnavailableException)
             {
                 ocrError = ex;
                 SourceMetaText.Text = $"OCR 失败：{ex.Message}";
@@ -2440,6 +2492,16 @@ public sealed partial class MainWindow : Window
         catch (OperationCanceledException)
         {
         }
+        catch (OcrComponentUnavailableException ex)
+        {
+            AppLog.Info(ex.Message);
+            EngineText.Text = _ocrComponents.IsEnabled ? "OCR 尚未安装" : "OCR 已关闭";
+            ShowTranslationMessage("PDF 页面已经打开；启用并安装 OCR 后即可识别和翻译。");
+            SetTranslationState("等待 OCR", TranslationVisualState.Idle);
+            StatusText.Text = ex.Message;
+            ShowPageError("需要 OCR 组件", ex.Message);
+            if (await PromptForOcrInstallAsync()) await RenderCurrentPageAsync(forceTranslation: true);
+        }
         catch (DllNotFoundException)
         {
             EngineText.Text = "OCR DLL 未找到";
@@ -2508,6 +2570,72 @@ public sealed partial class MainWindow : Window
             {
                 TranslationProgress.IsActive = false;
             }
+        }
+    }
+
+    /// <summary>
+    /// Explicit, process-local release acceptance hook. Normal launches never set
+    /// this variable; CI can use an isolated TRANSREADER_DATA_ROOT to exercise the
+    /// exact offline package import, verification and OCR startup path.
+    /// </summary>
+    private async Task RunComponentAcceptanceIfRequestedAsync()
+    {
+        var packagePath = Environment.GetEnvironmentVariable("TRANSREADER_OCR_COMPONENT_IMPORT");
+        if (string.IsNullOrWhiteSpace(packagePath)) return;
+        packagePath = Path.GetFullPath(packagePath);
+        AppLog.Info($"[组件验收] 正在导入 OCR 离线包：{Path.GetFileName(packagePath)}");
+        await _ocrComponents.ImportAsync(packagePath);
+        _ocrComponents.SetEnabled(true);
+        await _settingsStore.SaveOcrEnabledAsync(true);
+        await _ocrEngineProvider.ReloadAsync();
+        AppLog.Info("[组件验收] OCR 离线导入、逐文件校验、启动及冒烟识别全部通过");
+    }
+
+    private async Task<bool> PromptForOcrInstallAsync()
+    {
+        if (_ocrInstallPromptOpen) return false;
+        _ocrInstallPromptOpen = true;
+        try
+        {
+            var needsDownload = !_ocrComponents.IsInstalled;
+            var dialog = new ContentDialog
+            {
+                XamlRoot = Content.XamlRoot,
+                Title = needsDownload ? "安装 OCR 文字识别" : "开启 OCR 文字识别",
+                Content = needsDownload
+                    ? "首次使用需下载约 112 MB 的 PaddleOCR 可选组件。识别过程只在本机进行，下载失败会自动切换镜像。"
+                    : "OCR 组件已安装。开启后会启动本地识别进程，不会调用在线 API。",
+                PrimaryButtonText = needsDownload ? "下载安装" : "开启",
+                SecondaryButtonText = "打开本地组件设置",
+                CloseButtonText = "暂不使用",
+                DefaultButton = ContentDialogButton.Primary
+            };
+            var result = await dialog.ShowAsync();
+            if (result == ContentDialogResult.Secondary)
+            {
+                ShowSettingsView(true);
+                return false;
+            }
+            if (result != ContentDialogResult.Primary) return false;
+
+            StatusText.Text = needsDownload ? "正在安装 OCR 可选组件…" : "正在开启 OCR…";
+            if (needsDownload) await _ocrComponents.InstallOrRepairAsync();
+            _ocrComponents.SetEnabled(true);
+            await _settingsStore.SaveOcrEnabledAsync(true);
+            await _ocrEngineProvider.ReloadAsync();
+            EngineText.Text = "PaddleOCR · oneDNN";
+            return true;
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("OCR 安装 / 启动", ex);
+            ShowPageError("OCR 安装 / 启动失败", ex.Message);
+            StatusText.Text = "OCR 尚未就绪，可在“本地组件”中智能修复或导入离线包";
+            return false;
+        }
+        finally
+        {
+            _ocrInstallPromptOpen = false;
         }
     }
 
@@ -2650,7 +2778,7 @@ public sealed partial class MainWindow : Window
         {
             localSession = await _localModels.OpenSessionAsync(LocalAiPriority.ForegroundTranslation, token);
             assistantProfile = _localTranslator.CreateProfile(
-                translationProfile.Settings.TargetLanguage, localSession.BaseUri);
+                translationProfile.Settings.TargetLanguage, localSession.BaseUri, localSession.Descriptor);
         }
         else
         {

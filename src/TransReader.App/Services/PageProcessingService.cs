@@ -495,7 +495,7 @@ internal sealed class PageProcessingService : IDisposable
             return await TranslateOnlineAndCacheAsync(
                 key, documentKey, pageIndex, profile, context, contextFingerprint, job, documentToken, timer);
         }
-        catch (Exception ex) when (LocalFallbackEnabled && _localModels.IsInstalled && IsTransientOnlineFailure(ex))
+        catch (Exception ex) when (LocalFallbackEnabled && _localModels.IsTranslationModelInstalled && IsTransientOnlineFailure(ex))
         {
             // 在线瞬时故障（网络/限流/5xx）：自动改用本地模型兜底，结果按本地 provider key 落缓存。
             // 4xx 配置/鉴权错误不兜底——那是用户必须自己修的配置问题。

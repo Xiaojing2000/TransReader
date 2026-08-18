@@ -161,26 +161,16 @@ int TRANS_OCR_CALL trans_ocr_create(
 #if defined(TRANS_OCR_WITH_PADDLE)
         const auto config = json::parse(engine->config_json);
         const auto model_directory = utf8_path(config.at("modelDirectory").get<std::string>());
+        const auto pipeline_config = utf8_path(config.at("pipelineConfigPath").get<std::string>());
         const auto detection_directory = model_directory / "PP-OCRv5_mobile_det_infer";
         const auto recognition_directory = model_directory / "PP-OCRv5_mobile_rec_infer";
         if (!std::filesystem::is_directory(detection_directory) ||
             !std::filesystem::is_directory(recognition_directory)) {
             throw std::runtime_error("PP-OCRv5 mobile model directories were not found");
         }
-
-        // The vendored pipeline prints its real error to stderr right before
-        // calling exit(-1); capture stderr so failures stay diagnosable.
-        static std::once_flag stderr_redirect_once;
-        std::call_once(stderr_redirect_once, [] {
-            if (const char* temp = std::getenv("TEMP")) {
-                const auto log_path = std::filesystem::path(temp) / "transocr-native-stderr.log";
-                FILE* redirected = nullptr;
-                if (freopen_s(&redirected, log_path.string().c_str(), "a", stderr) != 0) {
-                    std::fprintf(stderr, "trans_ocr: failed to redirect stderr to %s\n",
-                                 log_path.string().c_str());
-                }
-            }
-        });
+        if (!std::filesystem::is_regular_file(pipeline_config)) {
+            throw std::runtime_error("PaddleOCR pipeline config was not found");
+        }
 
         PaddleOCRParams params;
         params.device = "cpu";
@@ -197,6 +187,9 @@ int TRANS_OCR_CALL trans_ocr_create(
         params.text_det_limit_type = "max";
         params.text_det_limit_side_len = 1600;
         params.mkldnn_cache_capacity = 32;
+        // Never derive this path from __FILE__: that only works inside the
+        // developer checkout and fails after installing the application.
+        params.paddlex_config = pipeline_config.string();
         engine->ocr = std::make_unique<PaddleOCR>(params);
 #endif
         *out_engine = engine.release();
@@ -270,4 +263,3 @@ void TRANS_OCR_CALL trans_ocr_free_string(char* value) {
 void TRANS_OCR_CALL trans_ocr_destroy(trans_ocr_engine engine) {
     delete static_cast<Engine*>(engine);
 }
-

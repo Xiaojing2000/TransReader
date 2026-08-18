@@ -31,7 +31,7 @@ It is surprisingly refreshing: open the PDF, start reading, and remain in the sa
 | | |
 | --- | --- |
 | **📖 Compare without losing your place**<br>The source page and translation remain side by side. Figures, footnotes, labels, and equations are always one glance away. | **🔍 Read scanned PDFs, locally**<br>PP-OCRv5 mobile detection and recognition run on the CPU through Paddle Inference. No GPU is required. |
-| **🌐 Bring your own model**<br>Use MiMo, Kimi, DeepSeek, GLM, or any OpenAI-compatible endpoint. Text-only and multimodal providers are both supported. | **🏠 Go fully local when the document matters**<br>Install Qwen3 1.7B from inside the app. llama.cpp handles local translation, library analysis, and reader questions. |
+| **🌐 Bring your own model**<br>Use MiMo, Kimi, DeepSeek, GLM, or any OpenAI-compatible endpoint. Text-only and multimodal providers are both supported. | **🏠 Go fully local when the document matters**<br>Install Hy-MT2 1.8B for translation or Qwen3 1.7B for questions and library analysis. llama.cpp runs both locally. |
 | **💬 Ask the paragraph, not a blank chatbot**<br>Select translated text and ask for an explanation. The assistant receives the passage, current page, and nearby reading context. | **🗂️ Build a library that remembers**<br>Keep PDFs, progress, thumbnails, OCR, translations, topics, summaries, and domain-aware terminology together. |
 
 ## A quick tour
@@ -51,13 +51,14 @@ The screenshots above are from the real Windows application using a synthetic pu
 
 ## Download and install
 
-The current stable release is **v0.3.1**. TransReader ships one supported **Windows x64 Setup package**, `TransReader-vX.Y.Z-win-x64-setup.exe`. It installs per-user without administrator access and provides a Start Menu entry, optional desktop shortcut, repair-friendly upgrades, and a standard uninstaller. v0.3.1 no longer ships a Portable ZIP.
+The current stable release is **v0.3.2**. TransReader ships one supported **Windows x64 Setup package**, `TransReader-vX.Y.Z-win-x64-setup.exe`. It installs per-user without administrator access and provides a Start Menu entry, optional desktop shortcut, repair-friendly upgrades, and a standard uninstaller. No Portable ZIP is published; the roughly 333 MB OCR runtime and models are now installed on demand.
 
 ### Download now
 
-- [Windows x64 setup](https://github.com/Xiaojing2000/TransReader/releases/latest/download/TransReader-v0.3.1-win-x64-setup.exe)
-- [SHA-256 checksums](https://github.com/Xiaojing2000/TransReader/releases/latest/download/TransReader-v0.3.1-SHA256SUMS.txt)
-- [Source code ZIP](https://github.com/Xiaojing2000/TransReader/archive/refs/tags/v0.3.1.zip)
+- [Windows x64 setup](https://github.com/Xiaojing2000/TransReader/releases/latest/download/TransReader-v0.3.2-win-x64-setup.exe)
+- [Offline OCR component](https://github.com/Xiaojing2000/TransReader/releases/latest/download/TransReader-OCR-PP-OCRv5-mobile-win-x64.zip)
+- [SHA-256 checksums](https://github.com/Xiaojing2000/TransReader/releases/latest/download/TransReader-v0.3.2-SHA256SUMS.txt)
+- [Source code ZIP](https://github.com/Xiaojing2000/TransReader/archive/refs/tags/v0.3.2.zip)
 - [All releases and release notes](https://github.com/Xiaojing2000/TransReader/releases)
 
 GitHub also generates `Source code (zip)` and `Source code (tar.gz)` automatically for every tagged release. Use the checksum file to verify downloaded packages.
@@ -71,7 +72,8 @@ See the complete [English installation and user guide](docs/INSTALL.md) or [中�
 - Windows 10 20H1 (19041) or later, x64.
 - An x64 processor with AVX support.
 - 8 GB RAM for online use; 16 GB is recommended for local AI.
-- About 520 MB for the app after installation, plus about 1.3 GB for the optional local model and runtime.
+- About 166 MB for the base app; the optional OCR component adds about 333 MB when installed.
+- Hy-MT2 1.8B or Qwen3 1.7B adds about 1.1–1.3 GB each; installing both needs about 2.5 GB.
 - Microsoft Edge WebView2 Runtime (normally included with Windows 11).
 
 ## Start reading in three minutes
@@ -80,7 +82,8 @@ See the complete [English installation and user guide](docs/INSTALL.md) or [中�
 2. Open a PDF. Native PDFs and scanned pages use the same reading surface.
 3. Pick a translation path:
    - **Online:** first run contains no model or API key. Open AI Center → Add Model, choose a MiMo, Kimi, GLM, or DeepSeek template (or a custom OpenAI-compatible URL), optionally discover `/models`, then save and test it.
-   - **Local:** open AI Center → Local AI and choose Install. The model and runtime are downloaded with size and SHA-256 verification.
+   - **Local:** open AI Center → Local Components. Hy-MT2 1.8B is recommended for professional translation; install Qwen3 1.7B as well for reader questions and library analysis. Downloads are size- and SHA-256-verified.
+   - **OCR:** install it at the first-use prompt, or manage installation, verification, reload, repair, and offline import under Local Components.
 4. Read the source on the left and the translation on the right. Select a passage whenever it deserves an explanation.
 5. Import documents into the library when you want progress, cached results, and organization to survive the session.
 
@@ -94,7 +97,7 @@ See the complete [English installation and user guide](docs/INSTALL.md) or [中�
 | Hardware | Modest CPU and memory | CPU inference; 16 GB RAM recommended |
 | Cost | Determined by your provider | No per-token API charge |
 
-OCR always runs locally. In online mode, only the endpoint you selected receives content. For confidential documents, also set Library Analysis and Reader Assistant to a local model source.
+When enabled, OCR always runs locally. Disabling it stops the worker and never silently substitutes an online OCR service. In online mode, only the endpoint you selected receives content. For confidential documents, also set Library Analysis and Reader Assistant to a local model source.
 
 ## Formulas, layout, and context are first-class
 
@@ -130,7 +133,7 @@ dotnet test .\tests\TransReader.Core.Tests -c Release
 To create the Setup package after installing Inno Setup:
 
 ```powershell
-.\scripts\publish.ps1 -Version 0.3.1
+.\scripts\publish.ps1 -Version 0.3.2
 ```
 
 Read [Building TransReader from Source](docs/BUILDING.md) or [中文构建手册](docs/BUILDING.zh-CN.md) for prerequisites, dependency locations, CI-only builds, and release steps.

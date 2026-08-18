@@ -69,10 +69,10 @@
                                 <ToggleSwitch x:Name="ModeToggle"
                                               IsOn="True"
                                               OnContent="在线翻译"
-                                              OffContent="本地 Qwen3"
+                                              OffContent="本地翻译"
                                               Toggled="ModeToggle_Toggled" />
                                 <TextBlock Style="{StaticResource CaptionStyle}"
-                                           Text="关闭时使用本地 Qwen3 1.7B 离线翻译；开启时调用「在线 API」页配置的接口。" />
+                                           Text="关闭时优先使用本地 Hy-MT2 专业翻译模型（未安装时兼容 Qwen3）；开启时调用「在线 API」页配置的接口。" />
                             </StackPanel>
                         </Border>
 
@@ -384,14 +384,64 @@
                     </StackPanel>
                 
 
-                <!-- ============ 本地 AI ============ -->
-                <TextBlock x:Name="SectionLocal" Text="本地 AI" FontSize="14" FontWeight="SemiBold" />
+                <!-- ============ 本地组件 ============ -->
+                <TextBlock x:Name="SectionLocal" Text="本地组件" FontSize="14" FontWeight="SemiBold" />
                     <StackPanel Spacing="12">
                         <InfoBar x:Name="LocalInfoBar" IsClosable="True" IsOpen="False" />
 
                         <Border Style="{StaticResource CardStyle}">
-                            <StackPanel Spacing="8">
-                                <TextBlock x:Name="LocalModelNameText" Style="{StaticResource CardTitleStyle}" />
+                            <StackPanel Spacing="10">
+                                <Grid>
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="OCR 文字识别" Style="{StaticResource CardTitleStyle}" />
+                                        <TextBlock Text="PaddleOCR PP-OCRv5 mobile · 可选组件" Style="{StaticResource CaptionStyle}" />
+                                    </StackPanel>
+                                    <ToggleSwitch x:Name="OcrEnabledToggle"
+                                                  HorizontalAlignment="Right"
+                                                  OnContent="开启"
+                                                  OffContent="关闭"
+                                                  Toggled="OcrEnabledToggle_Toggled" />
+                                </Grid>
+                                <TextBlock x:Name="OcrStatusText" Style="{StaticResource CaptionStyle}" />
+                                <ProgressBar x:Name="OcrInstallProgress"
+                                             Maximum="1"
+                                             Visibility="Collapsed" />
+                                <TextBlock x:Name="OcrInstalledSizeText" Style="{StaticResource CaptionStyle}" />
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button x:Name="OcrInstallButton"
+                                            Click="OcrInstall_Click"
+                                            Content="安装 / 智能修复"
+                                            Style="{ThemeResource AccentButtonStyle}" />
+                                    <Button x:Name="OcrReloadButton" Click="OcrReload_Click" Content="重新载入" />
+                                    <Button x:Name="OcrVerifyButton" Click="OcrVerify_Click" Content="校验" />
+                                    <Button x:Name="OcrImportButton" Click="OcrImport_Click" Content="导入离线包" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button x:Name="OcrForceButton" Click="OcrForce_Click" Content="强制重新安装" />
+                                    <Button x:Name="OcrUninstallButton" Click="OcrUninstall_Click" Content="卸载" />
+                                </StackPanel>
+                                <TextBlock Style="{StaticResource CaptionStyle}"
+                                           Text="首次使用时才需要安装，约 112 MB；会在 GitHub 官方源与 ghproxy.net 镜像间自动切换，也可导入发布页提供的离线组件包。" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource CardStyle}">
+                            <StackPanel Spacing="10">
+                                <Grid>
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="本地大模型" Style="{StaticResource CardTitleStyle}" />
+                                        <TextBlock Text="模型按需安装，共用本地推理运行时" Style="{StaticResource CaptionStyle}" />
+                                    </StackPanel>
+                                    <ToggleSwitch x:Name="LocalEnabledToggle"
+                                                  HorizontalAlignment="Right"
+                                                  OnContent="开启"
+                                                  OffContent="关闭"
+                                                  Toggled="LocalEnabledToggle_Toggled" />
+                                </Grid>
+                                <ComboBox x:Name="LocalModelPicker"
+                                          MinWidth="360"
+                                          HorizontalAlignment="Left"
+                                          SelectionChanged="LocalModelPicker_SelectionChanged" />
                                 <TextBlock x:Name="LocalStatusText" Style="{StaticResource CaptionStyle}" />
                                 <ProgressBar x:Name="LocalInstallProgress"
                                              Maximum="1"
@@ -407,15 +457,22 @@
                                     <Button x:Name="LocalVerifyButton"
                                             Click="LocalVerify_Click"
                                             Content="校验" />
+                                    <Button x:Name="LocalReloadButton"
+                                            Click="LocalReload_Click"
+                                            Content="重新载入" />
+                                    <Button x:Name="LocalForceButton"
+                                            Click="LocalForce_Click"
+                                            Content="强制重新安装" />
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
                                     <Button x:Name="LocalUninstallButton"
                                             Click="LocalUninstall_Click"
-                                            Content="卸载" />
+                                            Content="卸载全部本地模型" />
                                 </StackPanel>
+                                <TextBlock Style="{StaticResource CaptionStyle}"
+                                           Text="推荐 Hy-MT2 1.8B Q4_K_M 用于专业翻译（约 1.06 GiB）；Qwen3 1.7B 用于问答和文献整理。7B 版本体积和内存占用过高，因此桌面默认不提供。" />
                             </StackPanel>
                         </Border>
-
-                        <TextBlock Style="{StaticResource CaptionStyle}"
-                                   Text="模型与运行时合计约 1.3 GB，下载源在 HuggingFace 与 hf-mirror 之间自动切换；运行时按可用内存自动调节上下文长度（约需 2.2 GB 可提交内存），切回在线模式或闲置 10 分钟后自动卸载释放内存。" />
                     </StackPanel>
                 
 

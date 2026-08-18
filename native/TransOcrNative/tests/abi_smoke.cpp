@@ -56,14 +56,15 @@ int main(int argc, char** argv) {
 
     trans_ocr_engine engine = nullptr;
     char* error = nullptr;
-    const std::string config = argc > 1
-        ? std::string("{\"modelDirectory\":\"") + argv[1] + "\",\"threads\":2}"
-        : "{}";
-    const auto status = trans_ocr_create(config.c_str(), &engine, &error);
-    if (argc > 1) {
-        assert(status == TRANS_OCR_OK);
-        assert(engine != nullptr);
+    if (argc < 3) {
+        std::cerr << "usage: TransOcrNative.AbiSmoke <models> <OCR.yaml>\n";
+        return 2;
     }
+    const std::string config = std::string("{\"modelDirectory\":\"") + argv[1] +
+        "\",\"pipelineConfigPath\":\"" + argv[2] + "\",\"threads\":2}";
+    const auto status = trans_ocr_create(config.c_str(), &engine, &error);
+    assert(status == TRANS_OCR_OK);
+    assert(engine != nullptr);
     trans_ocr_free_string(error);
     if (engine != nullptr) {
 #ifdef _WIN32

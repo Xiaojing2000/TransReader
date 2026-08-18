@@ -59,4 +59,5 @@ jobs:
           generate_release_notes: true
           files: |
             artifacts/release/TransReader-v*-win-x64-setup.exe
+            artifacts/release/TransReader-OCR-PP-OCRv5-mobile-win-x64.zip
             artifacts/release/TransReader-v*-SHA256SUMS.txt
