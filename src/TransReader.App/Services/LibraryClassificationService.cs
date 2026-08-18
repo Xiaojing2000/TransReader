@@ -103,7 +103,7 @@ internal sealed class LibraryClassificationService
             // 复用 OpenAiCompatibleTranslator 的 HttpClient + 鉴权；5xx/连接/超时按 [1,3] 秒退避重试。
             // 在线服务若不接受 response_format=json_schema 或 thinking 字段（400），逐项降级重试。
             var includeSchema = true;
-            // kimi-k3 等推理型网关模型：DisableThinking=false 的 profile 绝不发送 thinking 字段
+            // Kimi 等推理型网关模型：DisableThinking=false 的 profile 绝不发送 thinking 字段
             // （网关会以误导性错误拒绝）；其他 400 场景由下方逐项降级兜底。
             var includeThinking = !useLocal && settings.DisableThinking;
             Exception? lastError = null;
@@ -152,15 +152,18 @@ internal sealed class LibraryClassificationService
                 new { role = "system", content = system },
                 new { role = "user", content = isLocal ? $"/no_think\n{context}" : context }
             },
-            // 温度必须跟随 profile（如 kimi-k3 只允许 0.6），硬编码 0.1 会被网关 400 拒绝。
-            ["temperature"] = temperature,
             ["stream"] = false,
             ["max_completion_tokens"] = isLocal ? 2000 : 8192,
         };
+        // 在线接口不指定温度，交给供应商使用自己的模型默认值；本地模型仍使用应用调优值。
+        if (isLocal)
+        {
+            body["temperature"] = temperature;
+        }
         if (includeThinking)
         {
             // 结构化抽取任务必须关掉推理输出：否则推理型模型会把 token 预算耗在思考上、content 为空。
-            // 注意：kimi-k3 等网关会拒绝该字段（400）——调用方只在 profile.DisableThinking 时才传。
+            // 注意：部分推理网关会拒绝该字段（400）——调用方只在 profile.DisableThinking 时才传。
             body["thinking"] = new { type = "disabled" };
         }
         if (includeSchema)

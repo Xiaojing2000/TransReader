@@ -42,6 +42,47 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
+; Files shipped by 0.3.0 through the full Windows App SDK metapackage or the
+; development runtime. Delete them during an in-place upgrade so slimming the
+; new payload also reduces an existing installation.
+[InstallDelete]
+Type: files; Name: "{app}\CommunityToolkit.*"
+Type: files; Name: "{app}\Microsoft.Windows.AI.*"
+Type: files; Name: "{app}\Microsoft.Windows.Widgets.*"
+Type: files; Name: "{app}\Microsoft.Graphics.Imaging*"
+Type: files; Name: "{app}\Microsoft.Graphics.Internal.Imaging*"
+Type: files; Name: "{app}\Microsoft.Windows.Workloads*"
+Type: files; Name: "{app}\Microsoft.Windows.Private.Workloads.*"
+Type: files; Name: "{app}\Microsoft.Windows.PrivateCommon.winmd"
+Type: files; Name: "{app}\Microsoft.Windows.*Vision*.winmd"
+Type: files; Name: "{app}\Microsoft.Windows.SemanticSearch.winmd"
+Type: files; Name: "{app}\Microsoft.WindowsAppRuntime.Insights.Resource.dll"
+Type: files; Name: "{app}\WindowsAppSdk.AppxDeploymentExtensions.*"
+Type: files; Name: "{app}\WindowsAppRuntime.DeploymentExtensions.*"
+Type: files; Name: "{app}\SessionHandleIPCProxyStub.dll"
+Type: files; Name: "{app}\DWriteCore.dll"
+Type: files; Name: "{app}\WindowsAppRuntime.png"
+Type: files; Name: "{app}\Microsoft.ML.OnnxRuntime.dll"
+Type: files; Name: "{app}\DirectML.dll"
+Type: files; Name: "{app}\onnxruntime*.dll"
+Type: files; Name: "{app}\System.Numerics.Tensors.dll"
+Type: files; Name: "{app}\workloads*.json"
+Type: filesandordirs; Name: "{app}\NpuDetect"
+Type: files; Name: "{app}\TransReader.*.pdb"
+Type: files; Name: "{app}\createdump.exe"
+Type: files; Name: "{app}\Microsoft.DiaSymReader.Native.amd64.dll"
+Type: files; Name: "{app}\mscordaccore*.dll"
+Type: files; Name: "{app}\mscordbi.dll"
+Type: files; Name: "{app}\Assets\AppIcon-16.png"
+Type: files; Name: "{app}\Assets\AppIcon-20.png"
+Type: files; Name: "{app}\Assets\AppIcon-24.png"
+Type: files; Name: "{app}\Assets\AppIcon-32.png"
+Type: files; Name: "{app}\Assets\AppIcon-48.png"
+Type: files; Name: "{app}\Assets\AppIcon-64.png"
+Type: files; Name: "{app}\Assets\AppIcon-256.png"
+Type: files; Name: "{app}\Assets\AppIcon-512.png"
+Type: filesandordirs; Name: "{app}\TransReader.App.exe.WebView2"
+
 [Icons]
 Name: "{group}\TransReader"; Filename: "{app}\TransReader.App.exe"
 Name: "{autodesktop}\TransReader"; Filename: "{app}\TransReader.App.exe"; Tasks: desktopicon

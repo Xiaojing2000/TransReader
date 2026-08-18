@@ -58,6 +58,5 @@ jobs:
         with:
           generate_release_notes: true
           files: |
-            artifacts/release/TransReader-v*-win-x64-portable.zip
             artifacts/release/TransReader-v*-win-x64-setup.exe
             artifacts/release/TransReader-v*-SHA256SUMS.txt

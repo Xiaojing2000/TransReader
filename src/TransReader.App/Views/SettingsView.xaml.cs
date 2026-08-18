@@ -1,11 +1,14 @@
 using System.ComponentModel;
 using System.Collections.ObjectModel;
+using System.Text.Encodings.Web;
+using System.Text.Json;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using TransReader.App.Services;
 using TransReader.Core.Storage;
 using TransReader.Core.Translation;
+using Windows.ApplicationModel.DataTransfer;
 
 namespace TransReader.App.Views;
 
@@ -17,12 +20,21 @@ namespace TransReader.App.Views;
 /// </summary>
 internal sealed partial class SettingsView : UserControl
 {
+    private static readonly TimeSpan ConnectionTestTimeout = TimeSpan.FromSeconds(20);
+    private static readonly JsonSerializerOptions PreviewJsonOptions = new()
+    {
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        WriteIndented = true
+    };
+
     private readonly SettingsViewContext _context;
     private readonly ObservableCollection<ProviderRowItem> _providerRows = new();
     private IReadOnlyList<TranslationProfile> _presets = [];
     private IReadOnlyList<TranslationProfile> _customs = [];
     private string? _editingId;
-    private bool _isNewCustom;
+    private bool _isNewModel;
+    private string _existingApiKey = string.Empty;
+    private Uri? _providerHomepageUri;
     private string _assistantSource = "follow";
     private string _libraryAnalysisSource = "local";
     private string _domainPreference = "auto";
@@ -30,6 +42,7 @@ internal sealed partial class SettingsView : UserControl
     private bool _suppressEvents;
     private bool _loaded;
     private bool _subscribedToLocal;
+    private UpdateRelease? _availableUpdate;
 
     public SettingsView(SettingsViewContext context)
     {
@@ -37,6 +50,8 @@ internal sealed partial class SettingsView : UserControl
         InitializeComponent();
         ProviderList.ItemsSource = _providerRows;
         LocalModelNameText.Text = LocalAiManifest.ModelDisplayName;
+        CurrentVersionText.Text = $"当前版本：{_context.UpdateService.CurrentVersionText}";
+        ApplyAvailableUpdate(_context.UpdateService.LastAvailableRelease);
         Loaded += SettingsView_Loaded;
         Unloaded += SettingsView_Unloaded;
     }
@@ -126,8 +141,10 @@ internal sealed partial class SettingsView : UserControl
     private async Task RefreshOverviewAsync()
     {
         var profile = await _context.SettingsStore.LoadAsync();
-        OverviewOnlineModelName.Text = profile.DisplayName;
-        var modality = profile.IsMultimodal ? "多模态（图文）" : "纯文本（OCR + 翻译）";
+        OverviewOnlineModelName.Text = profile.IsConfigured ? profile.DisplayName : "未配置在线模型";
+        var modality = profile.IsConfigured
+            ? profile.IsMultimodal ? "多模态（图文）" : "纯文本（OCR + 翻译）"
+            : "已配置模型 0 个";
         var status = !profile.IsCredentialStoreAvailable
             ? "凭据库不可用"
             : profile.IsConfigured ? "已配置" : "未配置";
@@ -157,14 +174,16 @@ internal sealed partial class SettingsView : UserControl
         {
             _providerRows.Add(CreateRow(profile, activeId, usage));
         }
-        ProviderCountText.Text = $"端点（{_providerRows.Count}）";
+        ProviderCountText.Text = $"已配置模型（{_providerRows.Count}）";
         var configuredCount = _providerRows.Count(row => row.StatusText == "已配置");
         ProviderSummaryText.Text =
-            $"自定义 {_customs.Count} 个 · 已配置 {configuredCount} 个 · 当前活动：{_providerRows.FirstOrDefault(row => row.IsActive)?.DisplayName ?? "未设置"}";
+            configuredCount == 0
+                ? "还没有模型。点击“添加模型”并输入自己的 API Key。"
+                : $"自定义 {_customs.Count} 个 · 当前活动：{_providerRows.FirstOrDefault(row => row.IsActive)?.DisplayName ?? "未设置"}";
         RefreshAssistantSourceItems();
         RefreshLibraryAnalysisSourceItems();
         // 表单只在用户显式点「编辑/添加」时展开；重载后若表单开着则刷新其内容。
-        if (ProviderFormCard.Visibility == Visibility.Visible && !_isNewCustom && _editingId is not null)
+        if (ProviderFormCard.Visibility == Visibility.Visible && !_isNewModel && _editingId is not null)
         {
             var row = _providerRows.FirstOrDefault(r => r.Id == _editingId);
             if (row is not null) LoadForm(row);
@@ -209,8 +228,9 @@ internal sealed partial class SettingsView : UserControl
 
     private void ProviderFormCancel_Click(object sender, RoutedEventArgs e)
     {
-        _isNewCustom = false;
+        _isNewModel = false;
         _editingId = null;
+        _existingApiKey = string.Empty;
         ProviderFormCard.Visibility = Visibility.Collapsed;
     }
 
@@ -227,11 +247,18 @@ internal sealed partial class SettingsView : UserControl
             return;
         }
         button.IsEnabled = false;
+        var originalContent = button.Content;
+        button.Content = "测试中…";
         row.ClearTestResult();
+        using var timeout = new CancellationTokenSource(ConnectionTestTimeout);
         try
         {
-            await new OpenAiCompatibleTranslator().TestAsync(profile.Settings, profile.ApiKey);
+            await new OpenAiCompatibleTranslator().TestAsync(profile.Settings, profile.ApiKey, timeout.Token);
             row.SetTestResult(true, "连接正常", "地址、鉴权和模型名称均可用。");
+        }
+        catch (OperationCanceledException) when (timeout.IsCancellationRequested)
+        {
+            row.SetTestResult(false, "连接超时", "20 秒内没有收到响应，请检查 API 地址、网络或模型 ID。");
         }
         catch (Exception ex)
         {
@@ -239,6 +266,7 @@ internal sealed partial class SettingsView : UserControl
         }
         finally
         {
+            button.Content = originalContent;
             button.IsEnabled = true;
         }
     }
@@ -287,7 +315,7 @@ internal sealed partial class SettingsView : UserControl
         var dialog = new ContentDialog
         {
             XamlRoot = XamlRoot,
-            Title = "删除自定义端点",
+            Title = "删除模型",
             Content = $"确定删除「{row?.DisplayName ?? id}」吗？其 API Key 将一并清除。",
             PrimaryButtonText = "删除",
             CloseButtonText = "取消",
@@ -299,7 +327,7 @@ internal sealed partial class SettingsView : UserControl
             {
                 return;
             }
-            await _context.SettingsStore.DeleteCustomProviderAsync(id);
+            await _context.SettingsStore.DeleteProviderAsync(id);
             if (_editingId == id)
             {
                 _editingId = null;
@@ -324,60 +352,62 @@ internal sealed partial class SettingsView : UserControl
         {
             return;
         }
-        _isNewCustom = false;
+        _isNewModel = false;
         _editingId = row.Id;
+        _existingApiKey = profile.ApiKey;
         _suppressEvents = true;
         try
         {
-            FormTitleText.Text = row.IsCustom ? "编辑自定义端点" : $"编辑：{profile.DisplayName}";
-            DisplayNameField.Visibility = row.IsCustom ? Visibility.Visible : Visibility.Collapsed;
-            DisplayNameBox.Text = row.IsCustom ? profile.CustomDisplayName ?? string.Empty : string.Empty;
+            FormTitleText.Text = $"编辑：{profile.DisplayName}";
+            SelectComboByTag(ProviderTemplateBox, row.IsCustom ? TranslationModelPresets.CustomId : row.Id);
+            ProviderTemplateBox.IsEnabled = false;
+            DisplayNameBox.Text = profile.DisplayName;
             BaseUrlBox.Text = profile.Settings.BaseUrl;
             ModelBox.Text = profile.Settings.Model;
-            ApiKeyBox.Password = profile.ApiKey;
-            SelectComboByTag(AuthModeBox, profile.Settings.AuthenticationMode);
+            ApiKeyBox.Password = string.Empty;
+            ApiKeyStatusText.Text = string.IsNullOrWhiteSpace(profile.ApiKey)
+                ? "尚未保存 API Key。"
+                : "API Key 已安全保存；留空可保持原 Key。";
             SelectComboByContent(ProviderLanguageBox, profile.Settings.TargetLanguage);
-            // 多模态按已存配置展示且可改（端点实际能力以用户配置为准；预设默认值仅首次安装有效）。
-            // 温度不进 StoredModel：预设温度是代码默认值、只读展示；自定义端点可编辑。
-            MultimodalToggle.IsOn = profile.Settings.IsMultimodal;
-            MultimodalToggle.IsEnabled = true;
-            TemperatureBox.Value = profile.Settings.Temperature;
-            TemperatureBox.IsEnabled = row.IsCustom;
+            ImageInputCheckBox.IsChecked = profile.Settings.IsMultimodal;
+            ReasoningToggle.IsOn = !profile.Settings.DisableThinking;
+            ResetDetectedModels();
+            ProviderFormStatusBar.IsOpen = false;
+            UpdateProviderHomepage();
         }
         finally
         {
             _suppressEvents = false;
         }
+        UpdateGeneratedJson();
     }
 
-    private void AddCustomProvider_Click(object sender, RoutedEventArgs e)
+    private void AddModel_Click(object sender, RoutedEventArgs e)
     {
-        _isNewCustom = true;
+        _isNewModel = true;
         _editingId = null;
+        _existingApiKey = string.Empty;
         _suppressEvents = true;
         try
         {
-            FormTitleText.Text = "新建自定义端点";
-            DisplayNameField.Visibility = Visibility.Visible;
-            DisplayNameBox.Text = string.Empty;
-            BaseUrlBox.Text = string.Empty;
-            ModelBox.Text = string.Empty;
-            ApiKeyBox.Password = string.Empty;
-            AuthModeBox.SelectedIndex = 0;
+            FormTitleText.Text = "添加模型";
+            ProviderTemplateBox.IsEnabled = true;
+            SelectComboByTag(ProviderTemplateBox, "mimo");
             ProviderLanguageBox.SelectedIndex = 0;
-            MultimodalToggle.IsOn = false;
-            MultimodalToggle.IsEnabled = true;
-            TemperatureBox.Value = 0.1;
-            TemperatureBox.IsEnabled = true;
+            ApplySelectedTemplate();
+            ApiKeyStatusText.Text = "尚未保存；API Key 不会出现在 JSON 中。";
+            ResetDetectedModels();
+            ProviderFormStatusBar.IsOpen = false;
         }
         finally
         {
             _suppressEvents = false;
         }
+        UpdateGeneratedJson();
         ShowProviderForm();
     }
 
-    private (string BaseUrl, string Model, string ApiKey, string AuthMode, string Language, double Temperature) ReadForm()
+    private ProviderFormValues ReadForm(bool requireModel = true)
     {
         var baseUrl = BaseUrlBox.Text.Trim();
         if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri) ||
@@ -386,19 +416,27 @@ internal sealed partial class SettingsView : UserControl
             throw new InvalidOperationException("请输入有效的 HTTP 或 HTTPS API 地址。");
         }
         var model = ModelBox.Text.Trim();
-        if (model.Length == 0)
+        if (requireModel && model.Length == 0)
         {
-            throw new InvalidOperationException("模型名称不能为空。");
+            throw new InvalidOperationException("模型 ID 不能为空。可以点击“检测模型”自动获取。");
         }
-        var authMode = (AuthModeBox.SelectedItem as ComboBoxItem)?.Tag as string ?? "api-key";
-        var apiKey = ApiKeyBox.Password;
+        var authMode = ResolveAuthenticationMode();
+        var apiKey = string.IsNullOrWhiteSpace(ApiKeyBox.Password)
+            ? _existingApiKey
+            : ApiKeyBox.Password.Trim();
         if (!authMode.Equals("none", StringComparison.OrdinalIgnoreCase) && string.IsNullOrWhiteSpace(apiKey))
         {
             throw new InvalidOperationException("API Key 不能为空。");
         }
         var language = (ProviderLanguageBox.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "简体中文";
-        var temperature = double.IsNaN(TemperatureBox.Value) ? 0.1 : TemperatureBox.Value;
-        return (baseUrl, model, apiKey, authMode, language, temperature);
+        return new ProviderFormValues(
+            baseUrl,
+            model,
+            apiKey,
+            authMode,
+            language,
+            ImageInputCheckBox.IsChecked == true,
+            ReasoningToggle.IsOn);
     }
 
     private async void ProviderSave_Click(object sender, RoutedEventArgs e)
@@ -406,56 +444,42 @@ internal sealed partial class SettingsView : UserControl
         try
         {
             var form = ReadForm();
-            if (_isNewCustom)
+            var templateId = SelectedTemplateId();
+            var id = _isNewModel
+                ? templateId == TranslationModelPresets.CustomId
+                    ? $"custom-{Guid.NewGuid():N}"
+                    : templateId
+                : _editingId;
+            if (string.IsNullOrWhiteSpace(id))
             {
-                var displayName = DisplayNameBox.Text.Trim();
-                if (displayName.Length == 0)
-                {
-                    throw new InvalidOperationException("请输入自定义端点的显示名称。");
-                }
-                var id = $"custom-{Guid.NewGuid():N}";
+                throw new InvalidOperationException("请选择供应商模板。");
+            }
+            var displayName = DisplayNameBox.Text.Trim();
+            if (displayName.Length == 0)
+            {
+                throw new InvalidOperationException("请输入模型的显示名称。");
+            }
+            if (IsCustomId(id))
+            {
                 await _context.SettingsStore.SaveCustomProviderAsync(
                     new TranslationSettingsStore.StoredCustomProvider(
                         id, displayName, form.BaseUrl, form.Model, form.AuthMode,
-                        MultimodalToggle.IsOn, form.Temperature, form.Language),
+                        form.IsMultimodal, 0.1, form.Language,
+                        DisableThinking: !form.Reasoning),
                     form.ApiKey);
-                _isNewCustom = false;
-                _editingId = id;
-            }
-            else if (_editingId is { } id)
-            {
-                if (IsCustomId(id))
-                {
-                    var displayName = DisplayNameBox.Text.Trim();
-                    if (displayName.Length == 0)
-                    {
-                        throw new InvalidOperationException("请输入自定义端点的显示名称。");
-                    }
-                    await _context.SettingsStore.SaveCustomProviderAsync(
-                        new TranslationSettingsStore.StoredCustomProvider(
-                            id, displayName, form.BaseUrl, form.Model, form.AuthMode,
-                            MultimodalToggle.IsOn, form.Temperature, form.Language),
-                        form.ApiKey);
-                }
-                else
-                {
-                    // 预设：多模态随用户开关持久化（StoredModel.IsMultimodal）；温度/DisableThinking
-                    // 取预设默认值（StoredModel 不存温度）。
-                    var preset = TranslationModelPresets.Find(id);
-                    var settings = new TranslationSettings(
-                        form.BaseUrl, form.Model, form.Language, form.AuthMode,
-                        IsMultimodal: MultimodalToggle.IsOn,
-                        Temperature: preset?.Temperature ?? 0.1,
-                        DisableThinking: preset?.DisableThinking ?? true,
-                        ProviderId: id);
-                    await _context.SettingsStore.SaveModelAsync(id, settings, form.ApiKey);
-                }
             }
             else
             {
-                return;
+                await _context.SettingsStore.SaveModelAsync(
+                    id,
+                    BuildSettings(form, id),
+                    form.ApiKey,
+                    displayName);
             }
+            await _context.SettingsStore.SetActiveModelAsync(id);
+            _isNewModel = false;
             _editingId = null;
+            _existingApiKey = string.Empty;
             ProviderFormCard.Visibility = Visibility.Collapsed;
             await ReloadProvidersAsync();
             await RefreshOverviewAsync();
@@ -471,28 +495,227 @@ internal sealed partial class SettingsView : UserControl
     private async void ProviderFormTest_Click(object sender, RoutedEventArgs e)
     {
         ProviderFormTestButton.IsEnabled = false;
-        ShowInfo(OnlineInfoBar, InfoBarSeverity.Informational, "正在连接", "正在请求模型，请稍候…");
+        ProviderFormTestButton.Content = "正在测试…";
+        TestConnectionProgressRing.Visibility = Visibility.Visible;
+        TestConnectionProgressRing.IsActive = true;
+        ShowInfo(ProviderFormStatusBar, InfoBarSeverity.Informational, "正在测试连接", "正在请求所选模型，最长等待 20 秒…");
+        using var timeout = new CancellationTokenSource(ConnectionTestTimeout);
         try
         {
+            await Task.Yield();
             var form = ReadForm();
-            var settings = new TranslationSettings(
-                form.BaseUrl, form.Model, form.Language, form.AuthMode,
-                IsMultimodal: MultimodalToggle.IsOn,
-                Temperature: form.Temperature,
-                DisableThinking: false,
-                ProviderId: _editingId ?? "custom");
-            await new OpenAiCompatibleTranslator().TestAsync(settings, form.ApiKey);
-            ShowInfo(OnlineInfoBar, InfoBarSeverity.Success, "连接成功", "地址、鉴权和模型名称均可用。");
+            var settings = BuildSettings(form, _editingId ?? SelectedTemplateId());
+            await new OpenAiCompatibleTranslator().TestAsync(settings, form.ApiKey, timeout.Token);
+            ShowInfo(ProviderFormStatusBar, InfoBarSeverity.Success, "连接成功", "API 地址、Key 和模型 ID 均可用。");
+        }
+        catch (OperationCanceledException) when (timeout.IsCancellationRequested)
+        {
+            ShowInfo(ProviderFormStatusBar, InfoBarSeverity.Error, "连接超时", "20 秒内没有收到响应，请检查 API 地址、网络或模型 ID。");
         }
         catch (Exception ex)
         {
-            ShowInfo(OnlineInfoBar, InfoBarSeverity.Error, "连接失败", ex.Message);
+            ShowInfo(ProviderFormStatusBar, InfoBarSeverity.Error, "连接失败", ex.Message);
         }
         finally
         {
+            TestConnectionProgressRing.IsActive = false;
+            TestConnectionProgressRing.Visibility = Visibility.Collapsed;
+            ProviderFormTestButton.Content = "测试连接";
             ProviderFormTestButton.IsEnabled = true;
         }
     }
+
+    private async void DetectModels_Click(object sender, RoutedEventArgs e)
+    {
+        DetectModelsButton.IsEnabled = false;
+        DetectModelsButton.Content = "检测中…";
+        ShowInfo(ProviderFormStatusBar, InfoBarSeverity.Informational, "正在检测模型", "正在读取 API 的 /models 列表，最长等待 20 秒…");
+        using var timeout = new CancellationTokenSource(ConnectionTestTimeout);
+        try
+        {
+            await Task.Yield();
+            var form = ReadForm(requireModel: false);
+            var settings = BuildSettings(form with
+            {
+                Model = string.IsNullOrWhiteSpace(form.Model) ? "model-discovery" : form.Model
+            }, _editingId ?? SelectedTemplateId());
+            var models = await new OpenAiCompatibleTranslator().DiscoverModelsAsync(settings, form.ApiKey, timeout.Token);
+            DetectedModelBox.Items.Clear();
+            foreach (var model in models)
+            {
+                DetectedModelBox.Items.Add(model);
+            }
+            DetectedModelBox.Visibility = Visibility.Visible;
+            var currentIndex = models.ToList().FindIndex(model =>
+                string.Equals(model, ModelBox.Text.Trim(), StringComparison.Ordinal));
+            DetectedModelBox.SelectedIndex = currentIndex >= 0 ? currentIndex : 0;
+            ShowInfo(ProviderFormStatusBar, InfoBarSeverity.Success, "检测完成", $"共发现 {models.Count} 个模型，请从列表中选择。");
+        }
+        catch (OperationCanceledException) when (timeout.IsCancellationRequested)
+        {
+            ResetDetectedModels();
+            ShowInfo(ProviderFormStatusBar, InfoBarSeverity.Error, "检测超时", "20 秒内没有收到响应，请检查 API 地址、Key 或网络。");
+        }
+        catch (Exception ex)
+        {
+            ResetDetectedModels();
+            ShowInfo(ProviderFormStatusBar, InfoBarSeverity.Error, "检测模型失败", ex.Message);
+        }
+        finally
+        {
+            DetectModelsButton.Content = "检测模型";
+            DetectModelsButton.IsEnabled = true;
+        }
+    }
+
+    private void DetectedModelBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressEvents || DetectedModelBox.SelectedItem is not string model)
+        {
+            return;
+        }
+        ModelBox.Text = model;
+    }
+
+    private void ProviderTemplateBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressEvents)
+        {
+            return;
+        }
+        _existingApiKey = string.Empty;
+        ApplySelectedTemplate();
+        ResetDetectedModels();
+        UpdateGeneratedJson();
+    }
+
+    private void ApplySelectedTemplate()
+    {
+        var preset = TranslationModelPresets.Find(SelectedTemplateId());
+        if (preset is null)
+        {
+            DisplayNameBox.Text = string.Empty;
+            BaseUrlBox.Text = string.Empty;
+            ModelBox.Text = string.Empty;
+            ApiKeyBox.Password = string.Empty;
+            ImageInputCheckBox.IsChecked = false;
+            ReasoningToggle.IsOn = true;
+        }
+        else
+        {
+            DisplayNameBox.Text = preset.DisplayName;
+            BaseUrlBox.Text = preset.BaseUrl;
+            ModelBox.Text = preset.Model;
+            ApiKeyBox.Password = string.Empty;
+            ImageInputCheckBox.IsChecked = preset.IsMultimodal;
+            ReasoningToggle.IsOn = !preset.DisableThinking;
+        }
+        ApiKeyStatusText.Text = "尚未保存；API Key 不会出现在 JSON 中。";
+        UpdateProviderHomepage();
+    }
+
+    private static TranslationSettings BuildSettings(ProviderFormValues form, string providerId) => new(
+        form.BaseUrl,
+        form.Model,
+        form.Language,
+        form.AuthMode,
+        IsMultimodal: form.IsMultimodal,
+        Temperature: 0.1,
+        DisableThinking: !form.Reasoning,
+        ProviderId: providerId);
+
+    private string ResolveAuthenticationMode() =>
+        TranslationModelPresets.Find(SelectedTemplateId())?.AuthenticationMode ?? "bearer";
+
+    private string SelectedTemplateId() =>
+        (ProviderTemplateBox.SelectedItem as ComboBoxItem)?.Tag?.ToString()
+        ?? TranslationModelPresets.CustomId;
+
+    private void ResetDetectedModels()
+    {
+        DetectedModelBox.Items.Clear();
+        DetectedModelBox.Visibility = Visibility.Collapsed;
+    }
+
+    private void ProviderFormValue_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!_suppressEvents)
+        {
+            UpdateGeneratedJson();
+        }
+    }
+
+    private void UpdateGeneratedJson()
+    {
+        if (GeneratedJsonBox is null)
+        {
+            return;
+        }
+        var modelId = ModelBox.Text.Trim();
+        var models = new List<Dictionary<string, object?>>();
+        if (modelId.Length > 0)
+        {
+            models.Add(new Dictionary<string, object?>
+            {
+                ["id"] = modelId,
+                ["name"] = DisplayNameBox.Text.Trim(),
+                ["input"] = ImageInputCheckBox.IsChecked == true ? new[] { "text", "image" } : new[] { "text" },
+                ["reasoning"] = ReasoningToggle.IsOn,
+                ["targetLanguage"] = (ProviderLanguageBox.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "简体中文"
+            });
+        }
+        var preview = new Dictionary<string, object?>
+        {
+            ["baseUrl"] = BaseUrlBox.Text.Trim(),
+            ["apiKey"] = string.Empty,
+            ["api"] = "openai-completions",
+            ["models"] = models
+        };
+        GeneratedJsonBox.Text = JsonSerializer.Serialize(preview, PreviewJsonOptions);
+    }
+
+    private void CopyGeneratedJson_Click(object sender, RoutedEventArgs e)
+    {
+        var package = new DataPackage();
+        package.SetText(GeneratedJsonBox.Text);
+        Clipboard.SetContent(package);
+        ShowInfo(OnlineInfoBar, InfoBarSeverity.Success, "已复制", "配置 JSON 已复制；其中不包含 API Key。 ");
+    }
+
+    private async void ProviderHomepageButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_providerHomepageUri is null)
+        {
+            return;
+        }
+        try
+        {
+            await Windows.System.Launcher.LaunchUriAsync(_providerHomepageUri);
+        }
+        catch (Exception ex)
+        {
+            ShowInfo(OnlineInfoBar, InfoBarSeverity.Error, "无法打开官网", ex.Message);
+        }
+    }
+
+    private void UpdateProviderHomepage()
+    {
+        var preset = TranslationModelPresets.Find(SelectedTemplateId());
+        _providerHomepageUri = preset is null ? null : new Uri(preset.HomepageUrl);
+        ProviderHomepageButton.IsEnabled = _providerHomepageUri is not null;
+        ProviderHomepageButton.Content = _providerHomepageUri is null
+            ? "自定义供应商（无官网链接）"
+            : $"官网：{preset!.HomepageUrl}";
+    }
+
+    private sealed record ProviderFormValues(
+        string BaseUrl,
+        string Model,
+        string ApiKey,
+        string AuthMode,
+        string Language,
+        bool IsMultimodal,
+        bool Reasoning);
 
     // ---------- 本地 AI ----------
 
@@ -770,6 +993,10 @@ internal sealed partial class SettingsView : UserControl
         {
             var language = (CapabilityLanguageBox.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "简体中文";
             var active = await _context.SettingsStore.LoadAsync();
+            if (!active.IsConfigured)
+            {
+                return;
+            }
             if (string.Equals(active.Settings.TargetLanguage, language, StringComparison.Ordinal))
             {
                 return;
@@ -781,7 +1008,8 @@ internal sealed partial class SettingsView : UserControl
                     new TranslationSettingsStore.StoredCustomProvider(
                         active.Id, active.CustomDisplayName ?? active.DisplayName,
                         active.Settings.BaseUrl, active.Settings.Model, active.Settings.AuthenticationMode,
-                        active.Settings.IsMultimodal, active.Settings.Temperature, language),
+                        active.Settings.IsMultimodal, active.Settings.Temperature, language,
+                        active.Settings.DisableThinking),
                     active.ApiKey);
             }
             else
@@ -976,6 +1204,97 @@ internal sealed partial class SettingsView : UserControl
             ? Visibility.Visible
             : Visibility.Collapsed;
     }
+
+    // ---------- 应用更新 ----------
+
+    private async void CheckUpdateButton_Click(object sender, RoutedEventArgs e)
+    {
+        CheckUpdateButton.IsEnabled = false;
+        InstallUpdateButton.IsEnabled = false;
+        UpdateStatusText.Text = "正在检查 GitHub Releases…";
+        UpdateInfoBar.IsOpen = false;
+        try
+        {
+            var release = await _context.UpdateService.CheckForUpdateAsync();
+            ApplyAvailableUpdate(release);
+            if (release is null)
+            {
+                ShowInfo(UpdateInfoBar, InfoBarSeverity.Success, "已是最新版", "当前没有可用的稳定版更新。");
+            }
+            else
+            {
+                ShowInfo(UpdateInfoBar, InfoBarSeverity.Informational, "发现新版本", $"版本 {release.Version} 已可下载。安装前会验证 SHA-256。 ");
+            }
+        }
+        catch (Exception ex)
+        {
+            ShowInfo(UpdateInfoBar, InfoBarSeverity.Error, "检查更新失败", ex.Message);
+            UpdateStatusText.Text = "暂时无法获取版本信息，请稍后重试。";
+        }
+        finally
+        {
+            CheckUpdateButton.IsEnabled = true;
+            InstallUpdateButton.IsEnabled = _availableUpdate is not null;
+        }
+    }
+
+    private async void InstallUpdateButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_availableUpdate is null)
+        {
+            return;
+        }
+
+        CheckUpdateButton.IsEnabled = false;
+        InstallUpdateButton.IsEnabled = false;
+        UpdateProgressBar.Visibility = Visibility.Visible;
+        UpdateProgressBar.IsIndeterminate = true;
+        UpdateInfoBar.IsOpen = false;
+        try
+        {
+            var progress = new Progress<UpdateDownloadProgress>(value =>
+            {
+                if (value.Percentage is double percentage)
+                {
+                    UpdateProgressBar.IsIndeterminate = false;
+                    UpdateProgressBar.Value = percentage;
+                    UpdateStatusText.Text = $"正在下载安装包… {percentage:0}%";
+                }
+                else
+                {
+                    UpdateStatusText.Text = "正在下载安装包…";
+                }
+            });
+            var installerPath = await _context.UpdateService.DownloadAndVerifyAsync(_availableUpdate, progress);
+            UpdateProgressBar.IsIndeterminate = false;
+            UpdateProgressBar.Value = 100;
+            UpdateStatusText.Text = "校验通过，正在启动安装程序…";
+            _context.UpdateService.LaunchInstaller(installerPath);
+            _context.ExitApplication();
+        }
+        catch (Exception ex)
+        {
+            ShowInfo(UpdateInfoBar, InfoBarSeverity.Error, "更新失败", ex.Message);
+            UpdateStatusText.Text = "更新未安装，当前版本不受影响。";
+            CheckUpdateButton.IsEnabled = true;
+            InstallUpdateButton.IsEnabled = true;
+            UpdateProgressBar.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private void ApplyAvailableUpdate(UpdateRelease? release)
+    {
+        _availableUpdate = release;
+        InstallUpdateButton.Visibility = release is null ? Visibility.Collapsed : Visibility.Visible;
+        InstallUpdateButton.IsEnabled = release is not null;
+        UpdateStatusText.Text = release is null
+            ? "可手动检查 GitHub Releases 中的稳定版本。"
+            : $"发现版本 {release.Version}，安装包约 {FormatFileSize(release.InstallerSize)}。";
+    }
+
+    private static string FormatFileSize(long bytes) => bytes > 0
+        ? $"{bytes / 1024d / 1024d:0.0} MiB"
+        : "未知大小";
 
     // ---------- 辅助 ----------
 

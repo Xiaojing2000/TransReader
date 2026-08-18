@@ -11,7 +11,7 @@ body:
     id: version
     attributes:
       label: Version / 版本
-      placeholder: v0.3.0, Setup or Portable
+      placeholder: v0.3.1, Windows x64 Setup
     validations:
       required: true
   - type: input

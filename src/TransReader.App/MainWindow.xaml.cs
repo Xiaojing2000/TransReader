@@ -2,6 +2,7 @@ using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
@@ -36,6 +37,8 @@ public sealed partial class MainWindow : Window
     private readonly LocalModelManager _localModels;
     private readonly LocalTextTranslationService _localTranslator;
     private readonly TranslationUsageStore _translationUsage;
+    private readonly UpdateService _updateService;
+    private readonly CancellationTokenSource _updateCheckCancellation = new();
     private readonly LibraryAnalysisQueue _libraryAnalysisQueue;
     private readonly LibraryAnalysisOrchestrator _libraryAnalysisOrchestrator;
     private ObservableCollection<ThumbnailItem> _thumbnailItems = [];
@@ -56,10 +59,7 @@ public sealed partial class MainWindow : Window
     };
     private uint? _pendingProgressPageIndex;
     private readonly OcrEngineProvider _ocrEngineProvider = new();
-    private TranslationProfile _onlineProfile = new(
-        "mimo",
-        TranslationSettings.MiMoDefault,
-        string.Empty);
+    private TranslationProfile _onlineProfile = TranslationProfile.Unconfigured;
     private TranslationExecutionMode _translationMode = TranslationExecutionMode.Online;
     private string _assistantModelSource = "follow";
     private bool _libraryAutoAnalysisEnabled = true;
@@ -98,6 +98,10 @@ public sealed partial class MainWindow : Window
     private bool _wideThumbnailPaneOpen = true;
     private readonly SyncLatch _thumbnailToggleLatch = new();
     private bool? _isWideReaderLayout;
+    // XAML can raise SizeChanged/Toggled/SelectionChanged while LoadComponent is
+    // still constructing the visual tree. Services are assigned only after
+    // InitializeComponent returns, so handlers must not enter runtime logic yet.
+    private bool _isInitializing = true;
 
     private TranslationProfile ActiveTranslationProfile => _translationMode == TranslationExecutionMode.Online
         ? _onlineProfile
@@ -107,7 +111,22 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        _markdownReader = new MarkdownReaderController(TranslationWebView, DispatcherQueue);
+
+        // TRANSREADER_DATA_ROOT is intentionally supported for automated demos/tests and
+        // portable troubleshooting. Normal users always fall back to LocalAppData.
+        var localRoot = Environment.GetEnvironmentVariable("TRANSREADER_DATA_ROOT");
+        if (string.IsNullOrWhiteSpace(localRoot))
+        {
+            localRoot = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "TransReader");
+        }
+        localRoot = Path.GetFullPath(localRoot);
+
+        _markdownReader = new MarkdownReaderController(
+            TranslationWebView,
+            DispatcherQueue,
+            Path.Combine(localRoot, "webview2"));
         _markdownReader.ReaderMessageReceived += MarkdownReader_ReaderMessageReceived;
         _ = InitializeMarkdownReaderAsync();
 
@@ -131,16 +150,7 @@ public sealed partial class MainWindow : Window
 
         ConfigureWindowChrome();
 
-        // TRANSREADER_DATA_ROOT is intentionally supported for automated demos/tests and
-        // portable troubleshooting. Normal users always fall back to LocalAppData.
-        var localRoot = Environment.GetEnvironmentVariable("TRANSREADER_DATA_ROOT");
-        if (string.IsNullOrWhiteSpace(localRoot))
-        {
-            localRoot = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "TransReader");
-        }
-        localRoot = Path.GetFullPath(localRoot);
+        _updateService = new UpdateService(localRoot);
         _settingsStore = new TranslationSettingsStore(Path.Combine(localRoot, "settings.json"));
         _legacyRecentFilesPath = Path.Combine(localRoot, "recent-files.json");
         _cacheRoot = Path.Combine(localRoot, "cache");
@@ -190,8 +200,11 @@ public sealed partial class MainWindow : Window
         RestoreWindowState();
 
         Closed += MainWindow_Closed;
+        _isInitializing = false;
+        ApplyReaderLayout(RootGrid.ActualWidth);
         _ = InitializeSettingsAsync();
         _ = ObserveOcrWarmupAsync();
+        _ = CheckForUpdatesOnStartupAsync();
     }
 
     private void UpdateThumbnailHighlightBrushes()
@@ -285,6 +298,8 @@ public sealed partial class MainWindow : Window
         _pageWorkCancellation?.Dispose();
         _thumbnailWork?.Cancel();
         _thumbnailWork?.Dispose();
+        _updateCheckCancellation.Cancel();
+        _updateCheckCancellation.Dispose();
         CancelThumbnailRequests();
         _pageNumberDebounceTimer.Stop();
         _librarySearchDebounceTimer.Stop();
@@ -913,7 +928,7 @@ public sealed partial class MainWindow : Window
 
     private void RootGrid_SizeChanged(object sender, SizeChangedEventArgs e)
     {
-        if (ReaderSplitView is null)
+        if (_isInitializing || ReaderSplitView is null)
         {
             return;
         }
@@ -978,7 +993,7 @@ public sealed partial class MainWindow : Window
 
     private async void OriginalPageScrollViewer_SizeChanged(object sender, SizeChangedEventArgs e)
     {
-        if (_fitToHeight)
+        if (!_isInitializing && _fitToHeight)
         {
             await FitCurrentPageToHeightAsync();
         }
@@ -986,10 +1001,31 @@ public sealed partial class MainWindow : Window
 
     private void OriginalPageScrollViewer_ViewChanged(object sender, ScrollViewerViewChangedEventArgs e)
     {
-        if (!_fitLatch.IsHeld && Math.Abs(OriginalPageScrollViewer.ZoomFactor - 1f) > 0.01f)
+        if (!_isInitializing && !_fitLatch.IsHeld && Math.Abs(OriginalPageScrollViewer.ZoomFactor - 1f) > 0.01f)
         {
             _fitToHeight = false;
         }
+    }
+
+    private void ReaderSplitter_DragDelta(object sender, DragDeltaEventArgs e)
+    {
+        var availableWidth = OriginalColumn.ActualWidth + TranslationColumn.ActualWidth;
+        if (availableWidth <= 0)
+        {
+            return;
+        }
+
+        const double minimumOriginalWidth = 280;
+        const double minimumTranslationWidth = 380;
+        var maximumOriginalWidth = Math.Max(minimumOriginalWidth, availableWidth - minimumTranslationWidth);
+        var originalWidth = Math.Clamp(
+            OriginalColumn.ActualWidth + e.HorizontalChange,
+            minimumOriginalWidth,
+            maximumOriginalWidth);
+        OriginalColumn.Width = new GridLength(originalWidth, GridUnitType.Pixel);
+        TranslationColumn.Width = new GridLength(
+            Math.Max(minimumTranslationWidth, availableWidth - originalWidth),
+            GridUnitType.Pixel);
     }
 
     private async Task FitCurrentPageToHeightAsync()
@@ -1314,7 +1350,9 @@ public sealed partial class MainWindow : Window
                 _localModels,
                 _translationUsage,
                 GetPendingAnalysisCount,
-                EnqueuePendingLibraryAnalysesAsync));
+                EnqueuePendingLibraryAnalysesAsync,
+                _updateService,
+                Close));
             view.CloseRequested += (_, _) => ShowSettingsView(false);
             view.SettingsChanged += async (_, _) => await OnSettingsChangedAsync();
             SettingsHostContent.Content = view;
@@ -1333,6 +1371,42 @@ public sealed partial class MainWindow : Window
     private int GetPendingAnalysisCount() =>
         _libraryEntries.Count(document => !document.IsTrashed &&
             document.AnalysisStatus == LibraryAnalysisStatus.Pending);
+
+    private async Task CheckForUpdatesOnStartupAsync()
+    {
+        if (!_updateService.IsAutomaticCheckDue())
+        {
+            return;
+        }
+
+        _updateService.MarkAutomaticCheckAttempted();
+        try
+        {
+            var release = await _updateService.CheckForUpdateAsync(_updateCheckCancellation.Token);
+            if (release is null || _updateCheckCancellation.IsCancellationRequested)
+            {
+                return;
+            }
+
+            UpdateInfoBar.Title = $"发现新版本 {release.Version}";
+            UpdateInfoBar.Message = "可在 AI 中心底部下载并安装；安装前会自动校验文件完整性。";
+            UpdateInfoBar.IsOpen = true;
+        }
+        catch (OperationCanceledException) when (_updateCheckCancellation.IsCancellationRequested)
+        {
+            // Window is closing.
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("自动检查更新", ex);
+        }
+    }
+
+    private void UpdateInfoBar_Click(object sender, RoutedEventArgs e)
+    {
+        UpdateInfoBar.IsOpen = false;
+        ShowSettingsView(true);
+    }
 
     private async Task OnSettingsChangedAsync()
     {
@@ -1360,6 +1434,7 @@ public sealed partial class MainWindow : Window
         TranslationDomainProfiles.SetOverrides(await _settingsStore.LoadDomainPromptHintsAsync());
         _libraryClassification.AnalysisSource = _libraryAnalysisSource;
         UpdateDomainHint();
+        await RefreshQuickModelPickerAsync();
         UpdateTranslationConfigurationUi();
         SelectQuickPicker(_onlineProfile.Id);
     }
@@ -1413,12 +1488,12 @@ public sealed partial class MainWindow : Window
             ? $"本地 · Qwen3 1.7B · {_localModels.Status.Message}"
             : _onlineProfile.IsConfigured
                 ? $"{_onlineProfile.DisplayName} · {(_onlineProfile.IsMultimodal ? "多模态" : "纯文本")}"
-                : $"{_onlineProfile.DisplayName} 未配置";
+                : "未配置在线模型";
         using (_translationModeLatch.Enter())
         {
             OnlineTranslationToggle.IsOn = !local;
         }
-        QuickModelPicker.IsEnabled = !local;
+        QuickModelPicker.IsEnabled = !local && QuickModelPicker.Items.Count > 0;
     }
 
     private async void OnlineTranslationToggle_Toggled(object sender, RoutedEventArgs e)
@@ -1483,6 +1558,25 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private async Task RefreshQuickModelPickerAsync()
+    {
+        var presets = await _settingsStore.LoadAllAsync();
+        var customs = await _settingsStore.LoadCustomProvidersAsync();
+        var configured = presets.Concat(customs).Where(profile => profile.IsConfigured).ToList();
+        using (_quickPickerLatch.Enter())
+        {
+            QuickModelPicker.Items.Clear();
+            foreach (var profile in configured)
+            {
+                QuickModelPicker.Items.Add(new ComboBoxItem
+                {
+                    Content = profile.DisplayName,
+                    Tag = profile.Id
+                });
+            }
+        }
+    }
+
     private async void QuickModelPicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_quickPickerLatch.IsHeld)
@@ -1496,13 +1590,12 @@ public sealed partial class MainWindow : Window
         }
         try
         {
-            var all = await _settingsStore.LoadAllAsync();
-            var match = all.FirstOrDefault(p => p.Id == id);
-            if (match is null)
+            var match = await _settingsStore.LoadProfileByIdAsync(id);
+            if (match is null || !match.IsConfigured)
             {
                 return;
             }
-            await _settingsStore.SaveAsync(match);
+            await _settingsStore.SetActiveModelAsync(match.Id);
             _onlineProfile = match;
             UpdateTranslationConfigurationUi();
             if (_processing.HasDocument)
