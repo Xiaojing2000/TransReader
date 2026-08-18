@@ -51,19 +51,13 @@
 
 ## 下载与安装
 
-译页目前提供 **Windows x64** 的两种传统发布格式：
-
-| 安装包 | 适合你，如果…… |
-| --- | --- |
-| `TransReader-vX.Y.Z-win-x64-setup.exe` | 希望像普通 Windows 软件一样安装：开始菜单、可选桌面快捷方式、覆盖升级和标准卸载入口。**推荐大多数用户选择。** |
-| `TransReader-vX.Y.Z-win-x64-portable.zip` | 希望自己管理目录、放在其他磁盘，或当前电脑没有软件安装权限。 |
+当前稳定版为 **v0.3.1**。译页只提供一个受支持的 **Windows x64 Setup 安装包**：`TransReader-vX.Y.Z-win-x64-setup.exe`。它安装到当前用户目录，不需要管理员权限，并提供开始菜单、可选桌面快捷方式、覆盖升级和标准卸载入口。v0.3.1 不再发布 Portable 便携包。
 
 ### 立即下载
 
-- [Windows 安装版（推荐）](https://github.com/Xiaojing2000/TransReader/releases/latest/download/TransReader-v0.3.0-win-x64-setup.exe)
-- [Windows 便携版](https://github.com/Xiaojing2000/TransReader/releases/latest/download/TransReader-v0.3.0-win-x64-portable.zip)
-- [SHA-256 校验文件](https://github.com/Xiaojing2000/TransReader/releases/latest/download/TransReader-v0.3.0-SHA256SUMS.txt)
-- [源代码 ZIP](https://github.com/Xiaojing2000/TransReader/archive/refs/tags/v0.3.0.zip)
+- [Windows x64 安装版](https://github.com/Xiaojing2000/TransReader/releases/latest/download/TransReader-v0.3.1-win-x64-setup.exe)
+- [SHA-256 校验文件](https://github.com/Xiaojing2000/TransReader/releases/latest/download/TransReader-v0.3.1-SHA256SUMS.txt)
+- [源代码 ZIP](https://github.com/Xiaojing2000/TransReader/archive/refs/tags/v0.3.1.zip)
 - [查看全部版本与发行说明](https://github.com/Xiaojing2000/TransReader/releases)
 
 GitHub Release 还会为每个标签自动提供 `Source code (zip)` 与 `Source code (tar.gz)`。校验文件用于确认安装包下载完整。
@@ -77,15 +71,15 @@ GitHub Release 还会为每个标签自动提供 `Source code (zip)` 与 `Source
 - Windows 10 20H1（19041）或更高版本，x64。
 - 支持 AVX 指令集的 x64 CPU。
 - 在线模式至少 8 GB 内存；本地 AI 建议 16 GB。
-- 应用安装后约需 600 MB；安装可选本地模型与运行时后另需约 1.3 GB。
+- 应用安装后约需 520 MB；安装可选本地模型与运行时后另需约 1.3 GB。
 - Microsoft Edge WebView2 Runtime（Windows 11 通常自带）。
 
 ## 三分钟开始阅读
 
-1. 安装 TransReader，或完整解压 Portable ZIP。
+1. 安装 TransReader 并从开始菜单启动。
 2. 打开一个 PDF。原生 PDF 和扫描 PDF 使用同一套阅读界面。
 3. 选择翻译方式：
-   - **在线模式**：打开“AI 中心”，选择预设或添加 OpenAI 兼容端点，填写模型和 API Key，然后测试连接。
+   - **在线模式**：首次启动没有预置模型或 API Key。打开“AI 中心 → 添加模型”，选择 MiMo、Kimi、GLM、DeepSeek 模板或自定义 OpenAI 兼容地址；可检测 `/models` 列表，选择模型后再保存并测试连接。
    - **本地模式**：打开“AI 中心 → 本地 AI”，点击安装。模型与运行时下载完成后会检查文件大小和 SHA-256。
 4. 左边看原页，右边读译文；遇到值得深挖的句子，选中并提问。
 5. 长期阅读的资料可以导入文献库，让进度、OCR、译文和整理结果保留下来。
@@ -113,7 +107,7 @@ OCR 始终在本地运行。在线模式只把内容交给你明确选择的端�
 
 ## 隐私与本地数据
 
-- API Key 通过 Windows 凭据库保存，不进入仓库，也不写入 `settings.json`。
+- API Key 通过 Windows 凭据库保存，不进入仓库，也不写入 `settings.json`；编辑页和自动生成的配置 JSON 也不会回显已保存的 Key。
 - 设置、文献库、日志、本地模型和缓存位于 `%LOCALAPPDATA%\TransReader`。
 - 本地模式的页面推理不离开设备。
 - 在线模式会把内容发送到用户配置的服务商，其隐私政策、条款和费用规则仍然适用。
@@ -131,10 +125,10 @@ OCR 始终在本地运行。在线模式只把内容交给你明确选择的端�
 dotnet test .\tests\TransReader.Core.Tests -c Release
 ```
 
-安装 Inno Setup 后，可同时生成 Setup 与 Portable：
+安装 Inno Setup 后可生成 Setup 安装包：
 
 ```powershell
-.\scripts\publish.ps1 -Version 0.3.0
+.\scripts\publish.ps1 -Version 0.3.1
 ```
 
 完整说明见[中文构建手册](docs/BUILDING.zh-CN.md)或 [Building TransReader from Source](docs/BUILDING.md)。
@@ -153,7 +147,7 @@ installer                    Inno Setup 安装器定义
 
 ## 当前边界
 
-译页目前只支持 Windows x64，应用界面以简体中文为主；中英文使用、安装和构建文档已经齐备，应用 UI 国际化是后续很欢迎的贡献方向。项目正在走向第一次正式公开发布，因此安装反馈和真实阅读场景中的问题尤其有价值。
+译页目前只支持 Windows x64，应用界面以简体中文为主；中英文使用、安装和构建文档已经齐备，应用 UI 国际化是后续很欢迎的贡献方向。项目仍处于早期公开版本阶段，因此安装反馈和真实阅读场景中的问题尤其有价值。
 
 ## 参与贡献
 

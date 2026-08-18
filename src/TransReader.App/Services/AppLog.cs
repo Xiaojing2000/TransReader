@@ -1,4 +1,6 @@
 using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading.Channels;
 
 namespace TransReader.App.Services;
@@ -36,7 +38,48 @@ internal static class AppLog
     /// <summary>记录未处理异常（崩溃），独立轮转文件，避免覆盖丢失上次崩溃现场。</summary>
     public static void Crash(Exception exception, string context) =>
         Enqueue(CrashPath, CrashCapBytes,
-            $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [CRASH v{AppVersion}] {context}\n{exception}\n\n");
+            $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [CRASH v{AppVersion}] {context}\n{FormatException(exception)}\n\n");
+
+    private static string FormatException(Exception exception)
+    {
+        var builder = new StringBuilder();
+        var current = exception;
+        var depth = 0;
+        while (current is not null)
+        {
+            if (depth > 0) builder.AppendLine($"--- Inner exception {depth} ---");
+            builder.AppendLine($"Type: {current.GetType().FullName}");
+            builder.AppendLine($"HRESULT: 0x{current.HResult:X8}");
+            builder.AppendLine($"Message: {current.Message}");
+            if (current.Data.Count > 0)
+            {
+                foreach (System.Collections.DictionaryEntry item in current.Data)
+                {
+                    builder.AppendLine($"Data[{item.Key}]: {item.Value}");
+                }
+            }
+            builder.AppendLine(current.StackTrace ?? "<no stack trace>");
+            current = current.InnerException;
+            depth++;
+        }
+
+        // WinRT failures can expose a more useful restricted error description
+        // than Exception.Message. Querying it is best-effort and must never hide
+        // the original crash if COM has already torn down.
+        try
+        {
+            var info = Marshal.GetExceptionForHR(exception.HResult);
+            if (info is not null && !string.Equals(info.Message, exception.Message, StringComparison.Ordinal))
+            {
+                builder.AppendLine($"HRESULT description: {info.Message}");
+            }
+        }
+        catch
+        {
+            // Crash formatting must never throw.
+        }
+        return builder.ToString().TrimEnd();
+    }
 
     /// <summary>关闭前冲刷：完成通道并等待写盘循环排空（限时 2 秒，绝不阻塞退出）。</summary>
     public static async Task ShutdownAsync()

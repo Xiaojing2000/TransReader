@@ -141,7 +141,6 @@ public sealed partial class OpenAiCompatibleTranslator
         {
             ["model"] = settings.Model.Trim(),
             ["messages"] = messages,
-            ["temperature"] = settings.Temperature,
             ["stream"] = true,
             ["max_completion_tokens"] = maxCompletionTokens,
         };
@@ -157,6 +156,7 @@ public sealed partial class OpenAiCompatibleTranslator
         }
         if (settings.IsLocal)
         {
+            requestBody["temperature"] = settings.Temperature;
             // 1.7B 小模型在稠密页面上容易陷入重复循环直至打满 token 上限；温和重复惩罚可破循环，
             // 回放实测 repeat_penalty 1.1 使 finish_reason 从 length 恢复为 stop。
             requestBody["repeat_penalty"] = 1.1;
@@ -651,9 +651,7 @@ public sealed partial class OpenAiCompatibleTranslator
         {
             ["model"] = settings.Model.Trim(),
             ["messages"] = new[] { new { role = "user", content = "Return only: OK" } },
-            ["temperature"] = 0.1,
             ["stream"] = false,
-            ["max_completion_tokens"] = 32,
         };
         if (!settings.IsLocal && settings.DisableThinking)
         {
@@ -667,6 +665,105 @@ public sealed partial class OpenAiCompatibleTranslator
         using var response = await _client.SendAsync(request, cancellationToken);
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
         if (!response.IsSuccessStatusCode) throw new TranslationException($"API 返回 {(int)response.StatusCode}：{TryReadError(body)}");
+    }
+
+    /// <summary>
+    /// 读取 OpenAI 兼容服务的模型目录。BaseUrl 可以是 API 根地址，也可以误填为
+    /// /chat/completions 或 /models；这里会统一规范到 GET /models。
+    /// </summary>
+    public async Task<IReadOnlyList<string>> DiscoverModelsAsync(
+        TranslationSettings settings,
+        string apiKey,
+        CancellationToken cancellationToken = default)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, GetModelsUrl(settings.BaseUrl));
+        ApplyAuthentication(request, settings, apiKey);
+        HttpResponseMessage response;
+        try
+        {
+            response = await _client.SendAsync(request, cancellationToken);
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new TranslationException($"无法连接模型目录：{ex.Message}");
+        }
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new TranslationException("模型目录响应超时，请检查网络或 API 地址。");
+        }
+
+        using (response)
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new TranslationException(
+                    $"模型目录返回 {(int)response.StatusCode} {response.ReasonPhrase}：{TryReadError(body)}",
+                    (int)response.StatusCode);
+            }
+
+            try
+            {
+                using var json = JsonDocument.Parse(body);
+                var root = json.RootElement;
+                var data = root.ValueKind == JsonValueKind.Object && root.TryGetProperty("data", out var dataElement)
+                    ? dataElement
+                    : root.ValueKind == JsonValueKind.Object && root.TryGetProperty("models", out var modelsElement)
+                        ? modelsElement
+                        : root;
+                if (data.ValueKind != JsonValueKind.Array)
+                {
+                    throw new TranslationException("模型目录响应中没有 data 数组。");
+                }
+
+                var models = data.EnumerateArray()
+                    .Select(item => item.ValueKind == JsonValueKind.String
+                        ? item.GetString()
+                        : item.ValueKind == JsonValueKind.Object && item.TryGetProperty("id", out var id)
+                            ? id.GetString()
+                            : null)
+                    .Where(id => !string.IsNullOrWhiteSpace(id))
+                    .Select(id => id!.Trim())
+                    .Distinct(StringComparer.Ordinal)
+                    .OrderBy(id => id, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                if (models.Count == 0)
+                {
+                    throw new TranslationException("接口连接成功，但没有返回任何模型 ID。");
+                }
+                return models;
+            }
+            catch (JsonException ex)
+            {
+                throw new TranslationException($"模型目录返回的 JSON 无法解析：{ex.Message}");
+            }
+        }
+    }
+
+    private static Uri GetModelsUrl(string baseUrl)
+    {
+        if (!Uri.TryCreate(baseUrl.Trim(), UriKind.Absolute, out var uri) ||
+            (uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp))
+        {
+            throw new TranslationException("请输入有效的 HTTP 或 HTTPS API 地址。");
+        }
+
+        var path = uri.AbsolutePath.TrimEnd('/');
+        if (path.EndsWith("/chat/completions", StringComparison.OrdinalIgnoreCase))
+        {
+            path = path[..^"/chat/completions".Length];
+        }
+        if (!path.EndsWith("/models", StringComparison.OrdinalIgnoreCase))
+        {
+            path += "/models";
+        }
+        var builder = new UriBuilder(uri)
+        {
+            Path = path,
+            Query = string.Empty,
+            Fragment = string.Empty
+        };
+        return builder.Uri;
     }
 
     private static string ToDataUrl(string mediaType, ReadOnlyMemory<byte> image) => $"data:{mediaType};base64,{Convert.ToBase64String(image.Span)}";

@@ -97,8 +97,9 @@ public sealed class MultimodalTranslatorTests
         Assert.Contains("\"model\":\"mimo-v2.5\"", handler.Body);
         Assert.Contains("data:image/jpeg;base64,AQID", handler.Body);
         Assert.Contains("OCR ORIGINAL", handler.Body);
-        Assert.Contains("\"thinking\":{\"type\":\"disabled\"}", handler.Body);
-        Assert.Equal("test-key", handler.ApiKey);
+        Assert.DoesNotContain("\"thinking\":{\"type\":\"disabled\"}", handler.Body);
+        Assert.DoesNotContain("\"temperature\"", handler.Body);
+        Assert.Equal("Bearer test-key", handler.Authorization);
     }
 
     [Fact]
@@ -289,7 +290,22 @@ public sealed class MultimodalTranslatorTests
 
         Assert.Contains("message", body);
         Assert.Contains("\"model\":\"mimo-v2.5\"", handler.Body);
-        Assert.Equal("test-key", handler.ApiKey);
+        Assert.Equal("Bearer test-key", handler.Authorization);
+    }
+
+    [Fact]
+    public async Task TestAsync_UsesProviderDefaultsWithoutTemperatureOrTokenLimit()
+    {
+        var handler = new CapturingHandler("""{"choices":[{"message":{"content":"OK"}}]}""");
+        using var client = new HttpClient(handler);
+        var translator = new OpenAiCompatibleTranslator(client);
+
+        await translator.TestAsync(TranslationSettings.MiMoDefault, "test-key");
+
+        Assert.Contains("\"model\":\"mimo-v2.5\"", handler.Body);
+        Assert.DoesNotContain("\"temperature\"", handler.Body);
+        Assert.DoesNotContain("max_completion_tokens", handler.Body);
+        Assert.Equal("Bearer test-key", handler.Authorization);
     }
 
     [Fact]
@@ -394,6 +410,26 @@ public sealed class MultimodalTranslatorTests
         Assert.DoesNotContain("本书为", ReadSystemPrompt(handler.Body));
     }
 
+    [Fact]
+    public async Task DiscoverModels_NormalizesUrlAndReturnsSortedDistinctIds()
+    {
+        var handler = new CapturingHandler("""{"data":[{"id":"z-model"},{"id":"a-model"},{"id":"a-model"}]}""");
+        using var client = new HttpClient(handler);
+        var translator = new OpenAiCompatibleTranslator(client);
+        var settings = new TranslationSettings(
+            "https://example.com/v1/chat/completions",
+            "placeholder",
+            "简体中文",
+            "bearer",
+            IsMultimodal: false);
+
+        var models = await translator.DiscoverModelsAsync(settings, "test-key");
+
+        Assert.Equal(new[] { "a-model", "z-model" }, models);
+        Assert.Equal("https://example.com/v1/models", handler.RequestUri?.ToString());
+        Assert.Equal("Bearer test-key", handler.Authorization);
+    }
+
     private static string ReadSystemPrompt(string requestBody)
     {
         using var json = JsonDocument.Parse(requestBody);
@@ -425,7 +461,9 @@ public sealed class MultimodalTranslatorTests
             HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
-            Body = await request.Content!.ReadAsStringAsync(cancellationToken);
+            Body = request.Content is null
+                ? string.Empty
+                : await request.Content.ReadAsStringAsync(cancellationToken);
             RequestUri = request.RequestUri;
             Authorization = request.Headers.Authorization?.ToString();
             ApiKey = request.Headers.TryGetValues("api-key", out var values)

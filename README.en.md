@@ -51,19 +51,13 @@ The screenshots above are from the real Windows application using a synthetic pu
 
 ## Download and install
 
-TransReader currently ships for **Windows x64** in two familiar formats:
-
-| Package | Choose it when... |
-| --- | --- |
-| `TransReader-vX.Y.Z-win-x64-setup.exe` | You want the normal Windows installation experience: Start Menu entry, optional desktop shortcut, repair-friendly upgrades, and a standard uninstaller. **Recommended for most people.** |
-| `TransReader-vX.Y.Z-win-x64-portable.zip` | You want to extract the app yourself, keep it on another drive, or use it without an installer. |
+The current stable release is **v0.3.1**. TransReader ships one supported **Windows x64 Setup package**, `TransReader-vX.Y.Z-win-x64-setup.exe`. It installs per-user without administrator access and provides a Start Menu entry, optional desktop shortcut, repair-friendly upgrades, and a standard uninstaller. v0.3.1 no longer ships a Portable ZIP.
 
 ### Download now
 
-- [Windows setup — recommended](https://github.com/Xiaojing2000/TransReader/releases/latest/download/TransReader-v0.3.0-win-x64-setup.exe)
-- [Windows portable ZIP](https://github.com/Xiaojing2000/TransReader/releases/latest/download/TransReader-v0.3.0-win-x64-portable.zip)
-- [SHA-256 checksums](https://github.com/Xiaojing2000/TransReader/releases/latest/download/TransReader-v0.3.0-SHA256SUMS.txt)
-- [Source code ZIP](https://github.com/Xiaojing2000/TransReader/archive/refs/tags/v0.3.0.zip)
+- [Windows x64 setup](https://github.com/Xiaojing2000/TransReader/releases/latest/download/TransReader-v0.3.1-win-x64-setup.exe)
+- [SHA-256 checksums](https://github.com/Xiaojing2000/TransReader/releases/latest/download/TransReader-v0.3.1-SHA256SUMS.txt)
+- [Source code ZIP](https://github.com/Xiaojing2000/TransReader/archive/refs/tags/v0.3.1.zip)
 - [All releases and release notes](https://github.com/Xiaojing2000/TransReader/releases)
 
 GitHub also generates `Source code (zip)` and `Source code (tar.gz)` automatically for every tagged release. Use the checksum file to verify downloaded packages.
@@ -77,15 +71,15 @@ See the complete [English installation and user guide](docs/INSTALL.md) or [中�
 - Windows 10 20H1 (19041) or later, x64.
 - An x64 processor with AVX support.
 - 8 GB RAM for online use; 16 GB is recommended for local AI.
-- About 600 MB for the app after installation, plus about 1.3 GB for the optional local model and runtime.
+- About 520 MB for the app after installation, plus about 1.3 GB for the optional local model and runtime.
 - Microsoft Edge WebView2 Runtime (normally included with Windows 11).
 
 ## Start reading in three minutes
 
-1. Install TransReader or extract the complete Portable ZIP.
+1. Install TransReader and launch it from the Start Menu.
 2. Open a PDF. Native PDFs and scanned pages use the same reading surface.
 3. Pick a translation path:
-   - **Online:** open AI Center, select a preset or add an OpenAI-compatible endpoint, enter the model and API key, then test it.
+   - **Online:** first run contains no model or API key. Open AI Center → Add Model, choose a MiMo, Kimi, GLM, or DeepSeek template (or a custom OpenAI-compatible URL), optionally discover `/models`, then save and test it.
    - **Local:** open AI Center → Local AI and choose Install. The model and runtime are downloaded with size and SHA-256 verification.
 4. Read the source on the left and the translation on the right. Select a passage whenever it deserves an explanation.
 5. Import documents into the library when you want progress, cached results, and organization to survive the session.
@@ -115,7 +109,7 @@ TransReader does more than replace English words with Chinese words:
 
 ## Privacy and local data
 
-- API keys are saved through Windows Credential Manager, not in the repository or `settings.json`.
+- API keys are saved through Windows Credential Manager, not in the repository or `settings.json`; saved keys are never echoed into the edit form or generated configuration JSON.
 - Settings, library data, logs, downloaded local models, and caches live under `%LOCALAPPDATA%\TransReader`.
 - Local mode keeps page inference on the device.
 - Online mode sends content to the user-configured provider; its privacy policy, terms, and charges apply.
@@ -133,10 +127,10 @@ A fresh clone can prepare the pinned native dependencies automatically:
 dotnet test .\tests\TransReader.Core.Tests -c Release
 ```
 
-To create both release packages after installing Inno Setup:
+To create the Setup package after installing Inno Setup:
 
 ```powershell
-.\scripts\publish.ps1 -Version 0.3.0
+.\scripts\publish.ps1 -Version 0.3.1
 ```
 
 Read [Building TransReader from Source](docs/BUILDING.md) or [中文构建手册](docs/BUILDING.zh-CN.md) for prerequisites, dependency locations, CI-only builds, and release steps.
@@ -155,7 +149,7 @@ installer                    Inno Setup definition
 
 ## Current scope
 
-TransReader is currently a Windows x64 project and the interface is primarily Simplified Chinese. English documentation is complete; application UI localization is a welcome future contribution. The project is moving toward its first public release, so practical bug reports and installation feedback are especially valuable.
+TransReader is currently a Windows x64 project and the interface is primarily Simplified Chinese. English documentation is complete; application UI localization is a welcome future contribution. The project is still in its early public-release stage, so practical bug reports and installation feedback are especially valuable.
 
 ## Contributing
 

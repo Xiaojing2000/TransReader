@@ -4,8 +4,8 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    xmlns:controls="using:CommunityToolkit.WinUI.Controls"
     xmlns:local="using:TransReader.App"
+    xmlns:primitives="using:Microsoft.UI.Xaml.Controls.Primitives"
     mc:Ignorable="d"
     Title="译页 TransReader">
 
@@ -194,15 +194,11 @@
                                   Toggled="OnlineTranslationToggle_Toggled" />
                 </StackPanel>
                 <ComboBox x:Name="QuickModelPicker"
-                          Width="120"
+                          Width="140"
                           VerticalAlignment="Center"
+                          PlaceholderText="无在线模型"
                           ToolTipService.ToolTip="切换翻译模型（完整配置见翻译设置）"
-                          SelectionChanged="QuickModelPicker_SelectionChanged">
-                    <ComboBoxItem Content="MiMo" Tag="mimo" />
-                    <ComboBoxItem Content="Kimi K3" Tag="kimi-k3" />
-                    <ComboBoxItem Content="DeepSeek" Tag="deepseek" />
-                    <ComboBoxItem Content="GLM" Tag="glm" />
-                </ComboBox>
+                          SelectionChanged="QuickModelPicker_SelectionChanged" />
                 <Button x:Name="ApiSettingsButton"
                         Style="{ThemeResource SubtleButtonStyle}"
                         ToolTipService.ToolTip="翻译设置（Ctrl+,）"
@@ -359,10 +355,11 @@
                     </Grid>
                 </Border>
 
-                <controls:GridSplitter Grid.Column="1"
-                                       HorizontalAlignment="Stretch"
-                                       VerticalAlignment="Stretch"
-                                       ResizeDirection="Columns" />
+                <primitives:Thumb Grid.Column="1"
+                                  HorizontalAlignment="Stretch"
+                                  VerticalAlignment="Stretch"
+                                  AutomationProperties.Name="调整原文和译文宽度"
+                                  DragDelta="ReaderSplitter_DragDelta" />
 
                 <Border Grid.Column="2" Style="{ThemeResource TransReaderCardStyle}">
                     <Grid>
@@ -442,7 +439,7 @@
                                      IsClosable="False"
                                      Severity="Informational"
                                      Title="尚未配置翻译模型"
-                                     Message="填写 MiMo API Key 后，识别完成会自动翻译当前页。">
+                                     Message="请在翻译设置中添加模型并填写自己的 API Key。">
                                 <InfoBar.ActionButton>
                                     <Button Content="立即配置" Click="ApiSettingsButton_Click" />
                                 </InfoBar.ActionButton>
@@ -787,6 +784,21 @@
                 </StackPanel>
             </Grid>
         </Border>
+
+        <InfoBar x:Name="UpdateInfoBar"
+                 Grid.Row="2"
+                 Canvas.ZIndex="20"
+                 Width="420"
+                 Margin="16"
+                 HorizontalAlignment="Right"
+                 VerticalAlignment="Top"
+                 IsOpen="False"
+                 IsClosable="True"
+                 Severity="Informational">
+            <InfoBar.ActionButton>
+                <Button Content="打开更新" Click="UpdateInfoBar_Click" />
+            </InfoBar.ActionButton>
+        </InfoBar>
 
 
         <ContentDialog x:Name="ShortcutsDialog"

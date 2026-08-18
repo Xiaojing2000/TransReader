@@ -36,20 +36,13 @@ That build does not contain working OCR and is intended only for CI or managed-c
 Install Inno Setup 6 or 7, then run:
 
 ```powershell
-.\scripts\publish.ps1 -Version 0.3.0
+.\scripts\publish.ps1 -Version 0.3.1
 ```
 
 The output under `artifacts/release` contains:
 
-- `TransReader-v0.3.0-win-x64-setup.exe`
-- `TransReader-v0.3.0-win-x64-portable.zip`
-- `TransReader-v0.3.0-SHA256SUMS.txt`
-
-To create only the Portable package:
-
-```powershell
-.\scripts\publish.ps1 -Version 0.3.0 -PortableOnly
-```
+- `TransReader-v0.3.1-win-x64-setup.exe`
+- `TransReader-v0.3.1-SHA256SUMS.txt`
 
 The release script performs a self-contained .NET publish, so end users do not need to install the .NET 10 Runtime separately. WebView2 Runtime remains a system requirement.
 
@@ -57,5 +50,5 @@ The release script performs a self-contained .NET publish, so end users do not n
 
 1. Update `Directory.Build.props` and `CHANGELOG.md`.
 2. Run the complete build, tests, and `scripts/publish.ps1`.
-3. Inspect both packages and their SHA-256 values.
+3. Inspect the Setup package and its SHA-256 value.
 4. Create a `vX.Y.Z` tag. GitHub Actions rebuilds from the official dependency sources and creates the Release.

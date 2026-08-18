@@ -14,6 +14,7 @@ internal sealed class MarkdownReaderController : IDisposable
     private readonly DispatcherQueueTimer _timer;
     private readonly DispatcherQueueTimer _answerTimer;
     private readonly string _assetDirectory;
+    private readonly string _userDataDirectory;
     private Task? _initializeTask;
     private MarkdownRenderUpdate? _pending;
     private ReaderAnswerUpdate? _pendingAnswer;
@@ -25,10 +26,11 @@ internal sealed class MarkdownReaderController : IDisposable
 
     public event Action<ReaderWebMessage>? ReaderMessageReceived;
 
-    public MarkdownReaderController(WebView2 view, DispatcherQueue dispatcherQueue)
+    public MarkdownReaderController(WebView2 view, DispatcherQueue dispatcherQueue, string userDataDirectory)
     {
         _view = view;
         _assetDirectory = Path.Combine(AppContext.BaseDirectory, "Assets", "Reader");
+        _userDataDirectory = Path.GetFullPath(userDataDirectory);
         _timer = dispatcherQueue.CreateTimer();
         _timer.Interval = TimeSpan.FromMilliseconds(120);
         _timer.IsRepeating = false;
@@ -94,7 +96,9 @@ internal sealed class MarkdownReaderController : IDisposable
         {
             throw new DirectoryNotFoundException($"Markdown reader assets were not found: {_assetDirectory}");
         }
-        await _view.EnsureCoreWebView2Async();
+        Directory.CreateDirectory(_userDataDirectory);
+        var environment = await CoreWebView2Environment.CreateWithOptionsAsync(null, _userDataDirectory, null);
+        await _view.EnsureCoreWebView2Async(environment);
         _view.CoreWebView2.Settings.AreDefaultContextMenusEnabled = true;
         _view.CoreWebView2.Settings.AreDevToolsEnabled = false;
         // 浏览器级加速器（如 Ctrl+F）在 WebView2 里没有对应 UI，关掉以免吞掉要转发给宿主的按键。

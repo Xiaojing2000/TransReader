@@ -4,7 +4,6 @@ param(
     [ValidateSet('Release')]
     [string]$Configuration = 'Release',
     [switch]$SkipBuild,
-    [switch]$PortableOnly,
     [string]$InnoSetupPath
 )
 
@@ -24,6 +23,7 @@ if ($Version -notmatch '^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$') {
 
 New-Item -ItemType Directory -Force -Path $releaseRoot, $stagingRoot | Out-Null
 $publishDirectory = Join-Path $stagingRoot "TransReader-v$Version-win-x64"
+$legacyPortablePath = Join-Path $releaseRoot "TransReader-v$Version-win-x64-portable.zip"
 
 function Assert-PathUnderArtifacts {
     param([Parameter(Mandatory)] [string]$Path)
@@ -37,6 +37,10 @@ function Assert-PathUnderArtifacts {
 if (Test-Path -LiteralPath $publishDirectory) {
     Assert-PathUnderArtifacts $publishDirectory
     Remove-Item -LiteralPath $publishDirectory -Recurse -Force
+}
+if (Test-Path -LiteralPath $legacyPortablePath) {
+    Assert-PathUnderArtifacts $legacyPortablePath
+    Remove-Item -LiteralPath $legacyPortablePath -Force
 }
 
 if (-not $SkipBuild) {
@@ -54,39 +58,86 @@ Copy-Item -LiteralPath (Join-Path $repositoryRoot 'THIRD_PARTY_NOTICES.md') -Des
 Copy-Item -LiteralPath (Join-Path $repositoryRoot 'docs\INSTALL.md') -Destination $publishDirectory
 Copy-Item -LiteralPath (Join-Path $repositoryRoot 'docs\INSTALL.zh-CN.md') -Destination $publishDirectory
 
-$portableName = "TransReader-v$Version-win-x64-portable.zip"
-$portablePath = Join-Path $releaseRoot $portableName
-if (Test-Path -LiteralPath $portablePath) { Remove-Item -LiteralPath $portablePath -Force }
+# .NET self-contained publishes include debugger/dump helpers that are not used
+# by the end-user application. Remove only the known diagnostic tools; coreclr,
+# clrjit, clrgc, hostfxr and resource DLLs remain untouched.
+$diagnosticFiles = @(
+    'createdump.exe',
+    'Microsoft.DiaSymReader.Native.amd64.dll',
+    'mscordaccore.dll',
+    'mscordbi.dll'
+)
+Get-ChildItem -LiteralPath $publishDirectory -File |
+    Where-Object {
+        $_.Name -in $diagnosticFiles -or
+        $_.Name -like 'mscordaccore_amd64_amd64_*.dll'
+    } |
+    Remove-Item -Force
 
-Add-Type -AssemblyName System.IO.Compression.FileSystem
-[System.IO.Compression.ZipFile]::CreateFromDirectory(
-    $publishDirectory,
-    $portablePath,
-    [System.IO.Compression.CompressionLevel]::Optimal,
-    $true)
-Write-Host "Created $portableName" -ForegroundColor Green
+function Assert-ReleasePayload {
+    param([Parameter(Mandatory)] [string]$Directory)
 
-if (-not $PortableOnly) {
-    $innoCandidates = @(
-        $InnoSetupPath,
-        (Join-Path $env:LOCALAPPDATA 'Programs\Inno Setup 7\ISCC.exe'),
-        'C:\Program Files\Inno Setup 7\ISCC.exe',
-        'C:\Program Files (x86)\Inno Setup 6\ISCC.exe',
-        'C:\Program Files\Inno Setup 6\ISCC.exe'
-    ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
-    $iscc = $innoCandidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
-    if (-not $iscc) {
-        throw 'Inno Setup compiler was not found. Install Inno Setup 6/7 or rerun with -PortableOnly.'
+    $required = @(
+        'TransReader.App.exe',
+        'TransReader.App.pri',
+        'Microsoft.UI.Xaml.dll',
+        'Microsoft.Web.WebView2.Core.dll',
+        'TransOcrNative.dll',
+        'TransOcrNative.Host.exe',
+        'paddle_inference.dll',
+        'models\PP-OCRv5_mobile_det_infer\inference.json',
+        'models\PP-OCRv5_mobile_rec_infer\inference.json'
+    )
+    $missing = $required | Where-Object { -not (Test-Path -LiteralPath (Join-Path $Directory $_) -PathType Leaf) }
+    if ($missing) {
+        throw "Release payload is missing required files: $($missing -join ', ')"
     }
 
-    $iss = Join-Path $repositoryRoot 'installer\TransReader.iss'
-    & $iscc "/DMyAppVersion=$Version" "/DSourceDir=$publishDirectory" "/DOutputDir=$releaseRoot" $iss
-    if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE." }
+    $files = Get-ChildItem -LiteralPath $Directory -File -Recurse
+    $forbidden = $files | Where-Object {
+        $_.Extension -eq '.pdb' -or
+        $_.Name -like 'CommunityToolkit.*' -or
+        $_.Name -like 'Microsoft.Windows.AI.*' -or
+        $_.Name -like 'Microsoft.Windows.Widgets.*' -or
+        $_.Name -like 'onnxruntime*.dll' -or
+        $_.Name -in @('DirectML.dll', 'Microsoft.ML.OnnxRuntime.dll', 'System.Numerics.Tensors.dll')
+    }
+    if ($forbidden) {
+        throw "Release payload contains development or unused component files: $($forbidden.Name -join ', ')"
+    }
+
+    $payloadBytes = ($files | Measure-Object Length -Sum).Sum
+    $payloadMiB = [Math]::Round($payloadBytes / 1MB, 2)
+    if ($payloadBytes -gt 510MB) {
+        throw "Release payload is $payloadMiB MiB, above the 510 MiB limit."
+    }
+    Write-Host "Validated release payload: $($files.Count) files, $payloadMiB MiB" -ForegroundColor Green
 }
 
-$releaseFiles = Get-ChildItem -LiteralPath $releaseRoot -File |
-    Where-Object Name -Like "TransReader-v$Version-win-x64-*" |
-    Sort-Object Name
+Assert-ReleasePayload -Directory $publishDirectory
+
+$innoCandidates = @(
+    $InnoSetupPath,
+    (Join-Path $env:LOCALAPPDATA 'Programs\Inno Setup 7\ISCC.exe'),
+    'C:\Program Files\Inno Setup 7\ISCC.exe',
+    'C:\Program Files (x86)\Inno Setup 6\ISCC.exe',
+    'C:\Program Files\Inno Setup 6\ISCC.exe'
+) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+$iscc = $innoCandidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
+if (-not $iscc) {
+    throw 'Inno Setup compiler was not found. Install Inno Setup 6 or 7.'
+}
+
+$iss = Join-Path $repositoryRoot 'installer\TransReader.iss'
+& $iscc "/DMyAppVersion=$Version" "/DSourceDir=$publishDirectory" "/DOutputDir=$releaseRoot" $iss
+if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE." }
+
+$releaseFiles = @(Get-ChildItem -LiteralPath $releaseRoot -File |
+    Where-Object Name -EQ "TransReader-v$Version-win-x64-setup.exe" |
+    Sort-Object Name)
+if ($releaseFiles.Count -ne 1) {
+    throw "Expected exactly one Setup artifact for version $Version, found $($releaseFiles.Count)."
+}
 $checksumPath = Join-Path $releaseRoot "TransReader-v$Version-SHA256SUMS.txt"
 $checksumLines = foreach ($file in $releaseFiles) {
     $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $file.FullName).Hash.ToLowerInvariant()
@@ -95,4 +146,4 @@ $checksumLines = foreach ($file in $releaseFiles) {
 [System.IO.File]::WriteAllLines($checksumPath, $checksumLines, [System.Text.UTF8Encoding]::new($false))
 
 Write-Host "Release artifacts are ready in $releaseRoot" -ForegroundColor Green
-$releaseFiles + (Get-Item -LiteralPath $checksumPath) | Select-Object Name, Length, FullName
+@($releaseFiles) + @(Get-Item -LiteralPath $checksumPath) | Select-Object Name, Length, FullName

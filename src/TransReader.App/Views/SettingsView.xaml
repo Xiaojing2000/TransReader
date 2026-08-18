@@ -104,8 +104,14 @@
                 <TextBlock x:Name="SectionOnline" Text="在线 API" FontSize="14" FontWeight="SemiBold" />
                     <StackPanel Spacing="12">
                         <InfoBar x:Name="OnlineInfoBar" IsClosable="True" IsOpen="False" />
+                        <InfoBar IsClosable="False"
+                                 IsOpen="True"
+                                 Severity="Informational"
+                                 Title="模型建议"
+                                 Message="建议使用小米 MiMo V2.5 模型，因为支持多模态且单价更实惠。" />
                         <TextBlock Style="{StaticResource CaptionStyle}"
-                                   Text="OpenAI 兼容接口；Key 保存到 Windows 凭据库，不写入配置文件。" />
+                                   Text="首次启动不预置任何模型。API Key 仅保存到 Windows 凭据库，不写入配置文件，也不会在编辑或 JSON 预览中回显。"
+                                   TextWrapping="Wrap" />
 
                         <Border Style="{StaticResource CardStyle}">
                             <StackPanel Spacing="12">
@@ -113,16 +119,16 @@
                                     <StackPanel VerticalAlignment="Center" Spacing="2">
                                         <TextBlock x:Name="ProviderCountText"
                                                    Style="{StaticResource CardTitleStyle}"
-                                                   Text="端点" />
+                                                   Text="已配置模型" />
                                         <TextBlock x:Name="ProviderSummaryText" Style="{StaticResource CaptionStyle}" />
                                     </StackPanel>
                                     <Button HorizontalAlignment="Right"
                                             VerticalAlignment="Center"
-                                            Click="AddCustomProvider_Click"
+                                            Click="AddModel_Click"
                                             Style="{ThemeResource AccentButtonStyle}">
                                         <StackPanel Orientation="Horizontal" Spacing="6">
                                             <FontIcon Glyph="&#xE710;" FontSize="12" />
-                                            <TextBlock Text="添加端点" />
+                                            <TextBlock Text="添加模型" />
                                         </StackPanel>
                                     </Button>
                                 </Grid>
@@ -215,8 +221,7 @@
                                                                 Click="ProviderTest_Click" />
                                                         <Button Content="删除"
                                                                 Tag="{x:Bind Id}"
-                                                                Click="ProviderDelete_Click"
-                                                                Visibility="{x:Bind IsCustom}" />
+                                                                Click="ProviderDelete_Click" />
                                                     </StackPanel>
                                                 </StackPanel>
                                             </Border>
@@ -226,19 +231,49 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- 编辑面板：默认收起，点「添加端点」或卡片「编辑」时展开 -->
+                        <!-- 编辑面板：默认收起，点「添加模型」或卡片「编辑」时展开 -->
                         <Border x:Name="ProviderFormCard"
                                 Style="{StaticResource CardStyle}"
                                 Visibility="Collapsed">
                             <StackPanel Spacing="12">
                                 <TextBlock x:Name="FormTitleText"
                                            Style="{StaticResource CardTitleStyle}"
-                                           Text="编辑端点" />
-                                <StackPanel x:Name="DisplayNameField" Spacing="4" Visibility="Collapsed">
+                                           Text="配置模型" />
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="供应商模板" Style="{StaticResource CaptionStyle}" />
+                                    <ComboBox x:Name="ProviderTemplateBox"
+                                              MinWidth="280"
+                                              HorizontalAlignment="Left"
+                                              SelectionChanged="ProviderTemplateBox_SelectionChanged">
+                                        <ComboBoxItem Content="小米 MiMo" Tag="mimo" />
+                                        <ComboBoxItem Content="Kimi" Tag="kimi" />
+                                        <ComboBoxItem Content="智谱 GLM" Tag="glm" />
+                                        <ComboBoxItem Content="DeepSeek" Tag="deepseek" />
+                                        <ComboBoxItem Content="自定义" Tag="custom" />
+                                    </ComboBox>
+                                    <HyperlinkButton x:Name="ProviderHomepageButton"
+                                                     Padding="0,4"
+                                                     Content="打开供应商官网"
+                                                     Click="ProviderHomepageButton_Click" />
+                                </StackPanel>
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="API 协议" Style="{StaticResource CaptionStyle}" />
+                                    <ComboBox x:Name="ApiProtocolBox"
+                                              MinWidth="280"
+                                              HorizontalAlignment="Left"
+                                              SelectedIndex="0">
+                                        <ComboBoxItem Content="OpenAI Completions" Tag="openai-completions" />
+                                    </ComboBox>
+                                    <TextBlock Text="适用于提供 OpenAI 兼容 /chat/completions 与 /models 接口的服务。"
+                                               Style="{StaticResource CaptionStyle}"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                                <StackPanel x:Name="DisplayNameField" Spacing="4">
                                     <TextBlock Text="显示名称" Style="{StaticResource CaptionStyle}" />
                                     <TextBox x:Name="DisplayNameBox"
                                              MinWidth="280"
                                              HorizontalAlignment="Left"
+                                             TextChanged="ProviderFormValue_Changed"
                                              PlaceholderText="例如：公司内网网关" />
                                 </StackPanel>
                                 <StackPanel Spacing="4">
@@ -246,59 +281,89 @@
                                     <TextBox x:Name="BaseUrlBox"
                                              MinWidth="420"
                                              HorizontalAlignment="Left"
+                                             TextChanged="ProviderFormValue_Changed"
                                              PlaceholderText="https://api.example.com/v1" />
-                                </StackPanel>
-                                <StackPanel Spacing="4">
-                                    <TextBlock Text="模型名称" Style="{StaticResource CaptionStyle}" />
-                                    <TextBox x:Name="ModelBox"
-                                             MinWidth="420"
-                                             HorizontalAlignment="Left" />
                                 </StackPanel>
                                 <StackPanel Spacing="4">
                                     <TextBlock Text="API Key" Style="{StaticResource CaptionStyle}" />
                                     <PasswordBox x:Name="ApiKeyBox"
                                                  MinWidth="420"
-                                                 HorizontalAlignment="Left" />
+                                                 HorizontalAlignment="Left"
+                                                 PasswordChanged="ProviderFormValue_Changed"
+                                                 PlaceholderText="请输入 API Key" />
+                                    <TextBlock x:Name="ApiKeyStatusText"
+                                               Style="{StaticResource CaptionStyle}"
+                                               Text="尚未保存；API Key 不会出现在 JSON 中。" />
                                 </StackPanel>
                                 <StackPanel Spacing="4">
-                                    <TextBlock Text="鉴权方式" Style="{StaticResource CaptionStyle}" />
-                                    <ComboBox x:Name="AuthModeBox"
-                                              MinWidth="280"
+                                    <TextBlock Text="模型 ID" Style="{StaticResource CaptionStyle}" />
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBox x:Name="ModelBox"
+                                                 MinWidth="320"
+                                                 TextChanged="ProviderFormValue_Changed"
+                                                 PlaceholderText="输入模型 ID，或先检测模型" />
+                                        <Button x:Name="DetectModelsButton"
+                                                Content="检测模型"
+                                                Click="DetectModels_Click" />
+                                    </StackPanel>
+                                    <ComboBox x:Name="DetectedModelBox"
+                                              MinWidth="420"
                                               HorizontalAlignment="Left"
-                                              SelectedIndex="0">
-                                        <ComboBoxItem Content="api-key 请求头" Tag="api-key" />
-                                        <ComboBoxItem Content="Authorization: Bearer" Tag="bearer" />
-                                        <ComboBoxItem Content="无鉴权（none）" Tag="none" />
-                                    </ComboBox>
+                                              PlaceholderText="请选择探测到的模型"
+                                              SelectionChanged="DetectedModelBox_SelectionChanged"
+                                              Visibility="Collapsed" />
                                 </StackPanel>
                                 <StackPanel Spacing="4">
                                     <TextBlock Text="目标语言" Style="{StaticResource CaptionStyle}" />
                                     <ComboBox x:Name="ProviderLanguageBox"
                                               MinWidth="280"
                                               HorizontalAlignment="Left"
-                                              SelectedIndex="0">
+                                              SelectedIndex="0"
+                                              SelectionChanged="ProviderFormValue_Changed">
                                         <ComboBoxItem Content="简体中文" />
                                         <ComboBoxItem Content="繁体中文" />
                                         <ComboBoxItem Content="英语" />
                                         <ComboBoxItem Content="日语" />
                                     </ComboBox>
                                 </StackPanel>
-                                <ToggleSwitch x:Name="MultimodalToggle"
-                                              Header="多模态（图文）"
-                                              OffContent="不支持"
-                                              OnContent="支持" />
-                                <StackPanel Spacing="4">
-                                    <TextBlock Text="温度（0 ~ 2；预设模型为固定值，仅自定义端点可编辑）"
-                                               Style="{StaticResource CaptionStyle}" />
-                                    <NumberBox x:Name="TemperatureBox"
-                                               Width="180"
-                                               HorizontalAlignment="Left"
-                                               Maximum="2"
-                                               Minimum="0"
-                                               SmallChange="0.1"
-                                               SpinButtonPlacementMode="Inline"
-                                               Value="0.1" />
+                                <StackPanel Spacing="6">
+                                    <TextBlock Text="输入类型" Style="{StaticResource CaptionStyle}" />
+                                    <StackPanel Orientation="Horizontal" Spacing="16">
+                                        <CheckBox Content="text" IsChecked="True" IsEnabled="False" />
+                                        <CheckBox x:Name="ImageInputCheckBox"
+                                                  Content="image"
+                                                  Checked="ProviderFormValue_Changed"
+                                                  Unchecked="ProviderFormValue_Changed" />
+                                    </StackPanel>
                                 </StackPanel>
+                                <ToggleSwitch x:Name="ReasoningToggle"
+                                              Header="推理模式"
+                                              OffContent="关闭"
+                                              OnContent="启用"
+                                              Toggled="ProviderFormValue_Changed" />
+                                <StackPanel Spacing="6">
+                                    <Grid>
+                                        <TextBlock Text="配置 JSON"
+                                                   Style="{StaticResource CardTitleStyle}"
+                                                   VerticalAlignment="Center" />
+                                        <Button HorizontalAlignment="Right"
+                                                Content="复制 JSON"
+                                                Click="CopyGeneratedJson_Click" />
+                                    </Grid>
+                                    <TextBox x:Name="GeneratedJsonBox"
+                                             MinHeight="260"
+                                             AcceptsReturn="True"
+                                             FontFamily="Consolas"
+                                             IsReadOnly="True"
+                                             TextWrapping="NoWrap"
+                                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                             ScrollViewer.HorizontalScrollBarVisibility="Auto" />
+                                    <TextBlock Text="预览中的 apiKey 始终为空；保存时 Key 单独写入 Windows 凭据库。"
+                                               Style="{StaticResource CaptionStyle}" />
+                                </StackPanel>
+                                <InfoBar x:Name="ProviderFormStatusBar"
+                                         IsClosable="False"
+                                         IsOpen="False" />
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <Button Click="ProviderSave_Click"
                                             Content="保存"
@@ -306,6 +371,11 @@
                                     <Button x:Name="ProviderFormTestButton"
                                             Click="ProviderFormTest_Click"
                                             Content="测试连接" />
+                                    <ProgressRing x:Name="TestConnectionProgressRing"
+                                                  Width="20"
+                                                  Height="20"
+                                                  IsActive="False"
+                                                  Visibility="Collapsed" />
                                     <Button Click="ProviderFormCancel_Click"
                                             Content="取消" />
                                 </StackPanel>
@@ -452,6 +522,32 @@
                                                  HorizontalAlignment="Left"
                                                  Click="InstallLocalModelLink_Click"
                                                  Content="安装本地模型后自动开始" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource CardStyle}">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="应用更新" Style="{StaticResource CardTitleStyle}" />
+                                <TextBlock x:Name="CurrentVersionText" Style="{StaticResource CaptionStyle}" />
+                                <TextBlock x:Name="UpdateStatusText"
+                                           Text="可手动检查 GitHub Releases 中的稳定版本。"
+                                           TextWrapping="Wrap"
+                                           Style="{StaticResource CaptionStyle}" />
+                                <ProgressBar x:Name="UpdateProgressBar"
+                                             Minimum="0"
+                                             Maximum="100"
+                                             Visibility="Collapsed" />
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button x:Name="CheckUpdateButton"
+                                            Content="检查更新"
+                                            Click="CheckUpdateButton_Click" />
+                                    <Button x:Name="InstallUpdateButton"
+                                            Content="下载并安装"
+                                            Click="InstallUpdateButton_Click"
+                                            Style="{ThemeResource AccentButtonStyle}"
+                                            Visibility="Collapsed" />
+                                </StackPanel>
+                                <InfoBar x:Name="UpdateInfoBar" IsClosable="True" IsOpen="False" />
                             </StackPanel>
                         </Border>
                     </StackPanel>

@@ -30,8 +30,9 @@ public sealed record TranslationSettings(
         "https://api.xiaomimimo.com/v1",
         "mimo-v2.5",
         "简体中文",
-        "api-key",
-        IsMultimodal: true);
+        "bearer",
+        IsMultimodal: true,
+        DisableThinking: false);
 
     public string GetChatCompletionsUrl()
     {

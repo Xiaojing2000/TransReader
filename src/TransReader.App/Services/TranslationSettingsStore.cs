@@ -7,12 +7,11 @@ namespace TransReader.App.Services;
 
 internal sealed class TranslationSettingsStore
 {
-    private const string ModelKeyResource = "TransReader.ModelKey";
-    private const int CurrentVersion = 4;
-
-    // 旧版单 profile 凭据（仅用于一次性迁移）。
-    private const string LegacyCredentialResource = "TransReader.TranslationApi";
-    private const string LegacyCredentialUser = "api-key";
+    // v2 intentionally starts with an empty credential namespace. Development
+    // builds and the old 0.3.0 installer shared the v1 resource, which could
+    // make a newly installed app appear to contain a bundled API key.
+    private const string ModelKeyResource = "TransReader.ModelKey.v2";
+    private const int CurrentVersion = 5;
 
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web)
     {
@@ -28,7 +27,7 @@ internal sealed class TranslationSettingsStore
     }
 
     /// <summary>
-    /// 加载活动模型的 profile。会自动从旧版单 profile 格式与旧凭据迁移。
+    /// 加载活动模型的 profile。旧设置文件只迁移公开配置，不迁移或回显旧 API Key。
     /// API Key 只从 Windows 凭据库读取，源码和设置文件均不保存密钥。
     /// 仅迁移/规范化真正改变了内容时才回写（启动不再无条件覆盖写）。
     /// </summary>
@@ -40,12 +39,6 @@ internal sealed class TranslationSettingsStore
             var (stored, migratedFromLegacy) = await LoadStoredAsync();
             stored = EnsureCompleteModels(stored, out var modelsChanged);
 
-            // 旧版凭据迁移：TransReader.TranslationApi/api-key -> TransReader.ModelKey/mimo
-            if (migratedFromLegacy)
-            {
-                MigrateLegacyApiKeyToMimo();
-            }
-
             // mimo-v2.5-pro -> mimo-v2.5（在新格式内对 mimo 项执行）
             var renamed = MigrateMimoProModelName(stored);
             if (migratedFromLegacy || modelsChanged || renamed)
@@ -54,15 +47,29 @@ internal sealed class TranslationSettingsStore
             }
 
             var activeId = ResolveActiveId(stored);
+            if (activeId is null)
+            {
+                return TranslationProfile.Unconfigured;
+            }
             var custom = (stored.CustomProviders ?? []).FirstOrDefault(p => p.Id == activeId);
             if (custom is not null)
             {
                 var customStatus = TryReadApiKey(custom.Id, out var customKey);
-                return BuildCustomProfile(custom, customKey ?? string.Empty, customStatus != ApiKeyReadStatus.StoreUnavailable);
+                var profile = BuildCustomProfile(custom, customKey ?? string.Empty, customStatus != ApiKeyReadStatus.StoreUnavailable);
+                return customStatus == ApiKeyReadStatus.StoreUnavailable || profile.IsConfigured
+                    ? profile
+                    : TranslationProfile.Unconfigured;
             }
-            var model = stored.Models.First(m => m.Id == activeId);
+            var model = stored.Models.FirstOrDefault(m => m.Id == activeId);
+            if (model is null)
+            {
+                return TranslationProfile.Unconfigured;
+            }
             var status = TryReadApiKey(model.Id, out var apiKey);
-            return BuildProfile(model, apiKey ?? string.Empty, status != ApiKeyReadStatus.StoreUnavailable);
+            var presetProfile = BuildProfile(model, apiKey ?? string.Empty, status != ApiKeyReadStatus.StoreUnavailable);
+            return status == ApiKeyReadStatus.StoreUnavailable || presetProfile.IsConfigured
+                ? presetProfile
+                : TranslationProfile.Unconfigured;
         }
         finally
         {
@@ -129,7 +136,7 @@ internal sealed class TranslationSettingsStore
         }
     }
 
-    /// <summary>返回全部预设各自的活动 profile（用于设置对话框多模型切换展示）。</summary>
+    /// <summary>返回用户已经完成配置的预设模型。内置预设只是新建模板，不算已配置模型。</summary>
     public async Task<IReadOnlyList<TranslationProfile>> LoadAllAsync()
     {
         await _ioGate.WaitAsync();
@@ -138,12 +145,15 @@ internal sealed class TranslationSettingsStore
             var (stored, _) = await LoadStoredAsync();
             stored = EnsureCompleteModels(stored);
             // 不写回：LoadAllAsync 是只读展示用途，写回交给 Save* 调用。
-            var result = new List<TranslationProfile>(TranslationModelPresets.Defaults.Count);
-            foreach (var preset in TranslationModelPresets.Defaults)
+            var result = new List<TranslationProfile>(stored.Models.Count);
+            foreach (var model in stored.Models)
             {
-                var model = stored.Models.FirstOrDefault(m => m.Id == preset.Id) ?? ToStored(preset);
-                var status = TryReadApiKey(preset.Id, out var apiKey);
-                result.Add(BuildProfile(model, apiKey ?? string.Empty, status != ApiKeyReadStatus.StoreUnavailable));
+                var status = TryReadApiKey(model.Id, out var apiKey);
+                var profile = BuildProfile(model, apiKey ?? string.Empty, status != ApiKeyReadStatus.StoreUnavailable);
+                if (profile.IsConfigured)
+                {
+                    result.Add(profile);
+                }
             }
             return result;
         }
@@ -173,14 +183,18 @@ internal sealed class TranslationSettingsStore
     }
 
     /// <summary>保存单个模型的设置与 key（不改变 ActiveModelId）。</summary>
-    public async Task SaveModelAsync(string id, TranslationSettings settings, string apiKey)
+    public async Task SaveModelAsync(
+        string id,
+        TranslationSettings settings,
+        string apiKey,
+        string? displayName = null)
     {
         await _ioGate.WaitAsync();
         try
         {
             var (stored, _) = await LoadStoredAsync();
             stored = EnsureCompleteModels(stored);
-            UpsertModel(stored, id, settings);
+            UpsertModel(stored, id, settings, displayName);
             await WriteStoredAsync(stored);
             WriteApiKey(id, apiKey);
         }
@@ -231,19 +245,26 @@ internal sealed class TranslationSettingsStore
         }
     }
 
-    /// <summary>删除自定义端点并清除其 Key；若它是活动模型则回落到 mimo。</summary>
-    public async Task DeleteCustomProviderAsync(string id)
+    /// <summary>删除一个已配置模型（预设或自定义）并清除其凭据。</summary>
+    public async Task DeleteProviderAsync(string id)
     {
         await _ioGate.WaitAsync();
         try
         {
             var (stored, _) = await LoadStoredAsync();
             stored = EnsureCompleteModels(stored);
-            var customs = (stored.CustomProviders ?? []).Where(p => p.Id != id).ToList();
+            var models = stored.Models.Where(model => model.Id != id).ToList();
+            var customs = (stored.CustomProviders ?? []).Where(provider => provider.Id != id).ToList();
+            var remainingIds = models.Select(model => model.Id).Concat(customs.Select(provider => provider.Id)).ToList();
             var activeId = string.Equals(stored.ActiveModelId, id, StringComparison.Ordinal)
-                ? "mimo"
+                ? remainingIds.FirstOrDefault()
                 : stored.ActiveModelId;
-            await WriteStoredAsync(stored with { CustomProviders = customs, ActiveModelId = activeId });
+            await WriteStoredAsync(stored with
+            {
+                Models = models,
+                CustomProviders = customs,
+                ActiveModelId = activeId
+            });
             WriteApiKey(id, null);
         }
         finally
@@ -600,7 +621,9 @@ internal sealed class TranslationSettingsStore
         string Model,
         string AuthenticationMode,
         bool IsMultimodal,
-        string TargetLanguage);
+        string TargetLanguage,
+        bool DisableThinking = true,
+        double Temperature = 0.1);
 
     /// <summary>自定义在线端点（预设之外的任意 OpenAI 兼容服务）。Id 形如 "custom-{guid:N}"，Key 按 Id 存凭据库。</summary>
     internal sealed record StoredCustomProvider(
@@ -611,7 +634,8 @@ internal sealed class TranslationSettingsStore
         string AuthenticationMode,
         bool IsMultimodal,
         double Temperature,
-        string TargetLanguage);
+        string TargetLanguage,
+        bool DisableThinking = false);
 
     // ---------- 加载 / 写入 ----------
 
@@ -643,8 +667,21 @@ internal sealed class TranslationSettingsStore
             try
             {
                 var parsed = JsonSerializer.Deserialize<StoredSettings>(text, SerializerOptions);
-                if (parsed is { Models: { Count: > 0 } })
+                if (parsed is { Models: not null })
                 {
+                    // v5 separates built-in templates from user models and starts a new
+                    // credential namespace. Reset only provider configuration once so an
+                    // upgrade cannot make an old development Key look preinstalled.
+                    if (parsed.Version < CurrentVersion)
+                    {
+                        return (parsed with
+                        {
+                            ActiveModelId = null,
+                            Version = CurrentVersion,
+                            Models = [],
+                            CustomProviders = []
+                        }, MigratedFromLegacy: true);
+                    }
                     return (parsed, MigratedFromLegacy: false);
                 }
             }
@@ -660,83 +697,38 @@ internal sealed class TranslationSettingsStore
 
     private static StoredSettings FreshDefaults()
     {
-        var models = TranslationModelPresets.Defaults
-            .Select(ToStored)
-            .ToList();
-        return new StoredSettings("mimo", CurrentVersion, models, TranslationExecutionMode.Online);
+        return new StoredSettings(null, CurrentVersion, [], TranslationExecutionMode.Online);
     }
 
-    private static StoredSettings MigrateFromLegacy(string text)
-    {
-        TranslationSettings? legacy = null;
-        try
-        {
-            legacy = JsonSerializer.Deserialize<TranslationSettings>(text, SerializerOptions);
-        }
-        catch (JsonException)
-        {
-        }
-        legacy ??= TranslationSettings.MiMoDefault;
-
-        // 旧格式里 mimo-v2.5-pro 也一并规整为 mimo-v2.5。
-        if (legacy.BaseUrl.Contains("xiaomimimo.com", StringComparison.OrdinalIgnoreCase) &&
-            legacy.Model.Equals("mimo-v2.5-pro", StringComparison.OrdinalIgnoreCase))
-        {
-            legacy = legacy with { Model = "mimo-v2.5" };
-        }
-
-        // 按预设匹配活动模型：默认 mimo，若 BaseUrl+Model 命中其他预设则用之。
-        var activeId = "mimo";
-        foreach (var preset in TranslationModelPresets.Defaults)
-        {
-            if (preset.BaseUrl.Equals(legacy.BaseUrl, StringComparison.OrdinalIgnoreCase) &&
-                preset.Model.Equals(legacy.Model, StringComparison.OrdinalIgnoreCase))
-            {
-                activeId = preset.Id;
-                break;
-            }
-        }
-
-        var models = TranslationModelPresets.Defaults
-            .Select(preset => preset.Id == activeId ? ToStored(preset, legacy) : ToStored(preset))
-            .ToList();
-
-        return new StoredSettings(activeId, CurrentVersion, models, TranslationExecutionMode.Online);
-    }
+    private static StoredSettings MigrateFromLegacy(string _) => FreshDefaults();
 
     private static StoredSettings EnsureCompleteModels(StoredSettings stored) =>
         EnsureCompleteModels(stored, out _);
 
     private static StoredSettings EnsureCompleteModels(StoredSettings stored, out bool changed)
     {
-        // 保证 4 个预设全部存在（升级到新格式后补齐缺失项）。
-        // 去重以防损坏的文件里出现重复 Id（ToDictionary 否则会抛异常）。
+        // 内置预设只是“添加模型”时的模板，不自动写成用户模型。这里只去重、
+        // 补齐已存项目的缺失字段，并保留用户已经修改过的值。
         var models = stored.Models ?? [];
-        var byId = models
+        var merged = models
             .Where(m => m is not null && !string.IsNullOrWhiteSpace(m.Id))
             .GroupBy(m => m.Id, StringComparer.Ordinal)
             .Select(g => g.First())
-            .ToDictionary(m => m.Id, m => m);
-        var merged = new List<StoredModel>(TranslationModelPresets.Defaults.Count);
-        foreach (var preset in TranslationModelPresets.Defaults)
-        {
-            if (byId.TryGetValue(preset.Id, out var existing))
+            .Select(existing =>
             {
-                // 保留用户已存储的值，但补齐缺失字段（旧文件可能缺 TargetLanguage/IsMultimodal）。
-                merged.Add(new StoredModel(
+                var preset = TranslationModelPresets.Find(existing.Id);
+                return new StoredModel(
                     existing.Id,
-                    string.IsNullOrWhiteSpace(existing.DisplayName) ? preset.DisplayName : existing.DisplayName,
-                    string.IsNullOrWhiteSpace(existing.BaseUrl) ? preset.BaseUrl : existing.BaseUrl,
-                    string.IsNullOrWhiteSpace(existing.Model) ? preset.Model : existing.Model,
-                    string.IsNullOrWhiteSpace(existing.AuthenticationMode) ? preset.AuthenticationMode : existing.AuthenticationMode,
+                    string.IsNullOrWhiteSpace(existing.DisplayName) ? preset?.DisplayName ?? existing.Id : existing.DisplayName,
+                    string.IsNullOrWhiteSpace(existing.BaseUrl) ? preset?.BaseUrl ?? string.Empty : existing.BaseUrl,
+                    string.IsNullOrWhiteSpace(existing.Model) ? preset?.Model ?? string.Empty : existing.Model,
+                    string.IsNullOrWhiteSpace(existing.AuthenticationMode) ? preset?.AuthenticationMode ?? "bearer" : existing.AuthenticationMode,
                     existing.IsMultimodal,
-                    string.IsNullOrWhiteSpace(existing.TargetLanguage) ? "简体中文" : existing.TargetLanguage));
-            }
-            else
-            {
-                merged.Add(ToStored(preset));
-            }
-        }
+                    string.IsNullOrWhiteSpace(existing.TargetLanguage) ? "简体中文" : existing.TargetLanguage,
+                    existing.DisableThinking,
+                    existing.Temperature);
+            })
+            .ToList();
         var completed = stored with { Models = merged, Version = CurrentVersion };
         changed = stored.Version != CurrentVersion || !models.SequenceEqual(merged);
         return completed;
@@ -756,57 +748,29 @@ internal sealed class TranslationSettingsStore
         return false;
     }
 
-    private void MigrateLegacyApiKeyToMimo()
-    {
-        string? legacyKey;
-        try
-        {
-            var credential = new PasswordVault().Retrieve(LegacyCredentialResource, LegacyCredentialUser);
-            credential.RetrievePassword();
-            legacyKey = credential.Password;
-        }
-        catch
-        {
-            return;
-        }
-        if (string.IsNullOrWhiteSpace(legacyKey))
-        {
-            return;
-        }
-        try
-        {
-            WriteApiKey("mimo", legacyKey);
-        }
-        catch (Exception ex)
-        {
-            // 迁移失败不应阻断启动：旧凭据仍在，下次启动会重试。
-            AppLog.Error("迁移旧版 API Key", ex);
-            return;
-        }
-        try
-        {
-            var vault = new PasswordVault();
-            var existing = vault.Retrieve(LegacyCredentialResource, LegacyCredentialUser);
-            vault.Remove(existing);
-        }
-        catch
-        {
-        }
-    }
-
-    private static void UpsertModel(StoredSettings stored, string id, TranslationSettings settings)
+    private static void UpsertModel(
+        StoredSettings stored,
+        string id,
+        TranslationSettings settings,
+        string? displayName = null)
     {
         var preset = TranslationModelPresets.Find(id);
-        var displayName = preset?.DisplayName
-            ?? (string.IsNullOrWhiteSpace(settings.Model) ? id : settings.Model);
+        var existing = stored.Models.FirstOrDefault(model => model.Id == id);
+        var resolvedDisplayName = !string.IsNullOrWhiteSpace(displayName)
+            ? displayName.Trim()
+            : !string.IsNullOrWhiteSpace(existing?.DisplayName)
+                ? existing.DisplayName
+                : preset?.DisplayName ?? (string.IsNullOrWhiteSpace(settings.Model) ? id : settings.Model);
         var updated = new StoredModel(
             id,
-            displayName,
+            resolvedDisplayName,
             settings.BaseUrl,
             settings.Model,
             settings.AuthenticationMode,
             settings.IsMultimodal,
-            settings.TargetLanguage);
+            settings.TargetLanguage,
+            settings.DisableThinking,
+            settings.Temperature);
         var index = stored.Models.FindIndex(m => m.Id == id);
         if (index >= 0)
         {
@@ -818,7 +782,7 @@ internal sealed class TranslationSettingsStore
         }
     }
 
-    private static string ResolveActiveId(StoredSettings stored)
+    private static string? ResolveActiveId(StoredSettings stored)
     {
         if (!string.IsNullOrWhiteSpace(stored.ActiveModelId) &&
             (stored.Models.Any(m => m.Id == stored.ActiveModelId) ||
@@ -826,7 +790,7 @@ internal sealed class TranslationSettingsStore
         {
             return stored.ActiveModelId!;
         }
-        return "mimo";
+        return stored.Models.FirstOrDefault()?.Id ?? stored.CustomProviders?.FirstOrDefault()?.Id;
     }
 
     private static TranslationProfile BuildProfile(StoredModel model, string apiKey, bool credentialStoreAvailable = true)
@@ -838,8 +802,8 @@ internal sealed class TranslationSettingsStore
             string.IsNullOrWhiteSpace(model.TargetLanguage) ? "简体中文" : model.TargetLanguage,
             string.IsNullOrWhiteSpace(model.AuthenticationMode) ? "api-key" : model.AuthenticationMode,
             model.IsMultimodal,
-            preset?.Temperature ?? 0.1,
-            preset?.DisableThinking ?? true,
+            model.Temperature,
+            model.DisableThinking,
             // ProviderId 只作用量统计标签（不进缓存 key）；CacheIdentity 留空以维持既有缓存兼容。
             ProviderId: preset?.Id ?? model.Id);
         return new TranslationProfile(model.Id, settings, apiKey)
@@ -858,7 +822,7 @@ internal sealed class TranslationSettingsStore
             string.IsNullOrWhiteSpace(provider.AuthenticationMode) ? "api-key" : provider.AuthenticationMode,
             provider.IsMultimodal,
             provider.Temperature,
-            DisableThinking: false,
+            provider.DisableThinking,
             ProviderId: provider.Id);
         return new TranslationProfile(provider.Id, settings, apiKey)
         {
@@ -866,24 +830,6 @@ internal sealed class TranslationSettingsStore
             CustomDisplayName = provider.DisplayName
         };
     }
-
-    private static StoredModel ToStored(TranslationModelPreset preset) => new(
-        preset.Id,
-        preset.DisplayName,
-        preset.BaseUrl,
-        preset.Model,
-        preset.AuthenticationMode,
-        preset.IsMultimodal,
-        "简体中文");
-
-    private static StoredModel ToStored(TranslationModelPreset preset, TranslationSettings overrideSettings) => new(
-        preset.Id,
-        preset.DisplayName,
-        overrideSettings.BaseUrl,
-        overrideSettings.Model,
-        overrideSettings.AuthenticationMode,
-        overrideSettings.IsMultimodal,
-        string.IsNullOrWhiteSpace(overrideSettings.TargetLanguage) ? "简体中文" : overrideSettings.TargetLanguage);
 
     private async Task WriteStoredAsync(StoredSettings stored) =>
         await AtomicJsonFile.WriteAsync(_settingsPath, stored, SerializerOptions);
@@ -907,6 +853,11 @@ internal enum ApiKeyReadStatus
 /// </summary>
 internal sealed record TranslationProfile(string Id, TranslationSettings Settings, string ApiKey)
 {
+    public static TranslationProfile Unconfigured { get; } = new(
+        "unconfigured",
+        new TranslationSettings(string.Empty, string.Empty, "简体中文", "bearer", IsMultimodal: false),
+        string.Empty);
+
     /// <summary>
     /// 读取本 profile 的 Key 时凭据库是否可用。为 false 时 ApiKey 为空不代表"未配置"，
     /// 调用方应提示凭据库故障而非引导重新配置。

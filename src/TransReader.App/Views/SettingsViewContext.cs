@@ -18,4 +18,8 @@ internal sealed record SettingsViewContext(
     /// <summary>当前文献库中等待自动分析的篇数（文献库整理状态展示）。</summary>
     Func<int> GetPendingAnalysisCount,
     /// <summary>本地模型安装完成后调用：把等待中的文献重新入队分析。</summary>
-    Func<Task> EnqueuePendingAnalysesAsync);
+    Func<Task> EnqueuePendingAnalysesAsync,
+    /// <summary>GitHub Releases 更新检查、下载与校验服务。</summary>
+    UpdateService UpdateService,
+    /// <summary>安装程序启动成功后关闭宿主应用。</summary>
+    Action ExitApplication);

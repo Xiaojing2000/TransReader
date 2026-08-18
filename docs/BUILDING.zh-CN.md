@@ -36,20 +36,13 @@ dotnet build .\src\TransReader.App\TransReader.App.csproj -c Release -p:Platform
 安装 Inno Setup 6 或 7 后运行：
 
 ```powershell
-.\scripts\publish.ps1 -Version 0.3.0
+.\scripts\publish.ps1 -Version 0.3.1
 ```
 
 输出位于 `artifacts/release`：
 
-- `TransReader-v0.3.0-win-x64-setup.exe`
-- `TransReader-v0.3.0-win-x64-portable.zip`
-- `TransReader-v0.3.0-SHA256SUMS.txt`
-
-如果只需要 Portable：
-
-```powershell
-.\scripts\publish.ps1 -Version 0.3.0 -PortableOnly
-```
+- `TransReader-v0.3.1-win-x64-setup.exe`
+- `TransReader-v0.3.1-SHA256SUMS.txt`
 
 发布脚本使用 self-contained .NET publish，因此最终用户不需要单独安装 .NET 10 Runtime。WebView2 Runtime 仍是系统要求。
 
@@ -57,5 +50,5 @@ dotnet build .\src\TransReader.App\TransReader.App.csproj -c Release -p:Platform
 
 1. 更新 `Directory.Build.props` 和 `CHANGELOG.md`。
 2. 完整运行构建、测试和 `scripts/publish.ps1`。
-3. 检查两个发布包和 SHA-256。
+3. 检查 Setup 安装包和 SHA-256。
 4. 创建 `vX.Y.Z` 标签。GitHub Actions 会重新从官方依赖源构建并生成 Release。
