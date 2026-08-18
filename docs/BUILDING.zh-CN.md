@@ -36,13 +36,16 @@ dotnet build .\src\TransReader.App\TransReader.App.csproj -c Release -p:Platform
 安装 Inno Setup 6 或 7 后运行：
 
 ```powershell
-.\scripts\publish.ps1 -Version 0.3.1
+.\scripts\publish.ps1 -Version 0.3.2
 ```
 
 输出位于 `artifacts/release`：
 
-- `TransReader-v0.3.1-win-x64-setup.exe`
-- `TransReader-v0.3.1-SHA256SUMS.txt`
+- `TransReader-v0.3.2-win-x64-setup.exe`
+- `TransReader-OCR-PP-OCRv5-mobile-win-x64.zip`
+- `TransReader-v0.3.2-SHA256SUMS.txt`
+
+基础 Setup 会明确排除 Paddle/OpenCV/MKL 运行库和 PP-OCRv5 模型。`package-ocr-component.ps1` 会为这些文件生成带逐文件清单、可复现的可选组件包；校验文件同时覆盖两个发行资产。发布流程不会生成 Portable ZIP。
 
 发布脚本使用 self-contained .NET publish，因此最终用户不需要单独安装 .NET 10 Runtime。WebView2 Runtime 仍是系统要求。
 

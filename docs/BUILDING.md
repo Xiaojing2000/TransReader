@@ -36,13 +36,16 @@ That build does not contain working OCR and is intended only for CI or managed-c
 Install Inno Setup 6 or 7, then run:
 
 ```powershell
-.\scripts\publish.ps1 -Version 0.3.1
+.\scripts\publish.ps1 -Version 0.3.2
 ```
 
 The output under `artifacts/release` contains:
 
-- `TransReader-v0.3.1-win-x64-setup.exe`
-- `TransReader-v0.3.1-SHA256SUMS.txt`
+- `TransReader-v0.3.2-win-x64-setup.exe`
+- `TransReader-OCR-PP-OCRv5-mobile-win-x64.zip`
+- `TransReader-v0.3.2-SHA256SUMS.txt`
+
+The base Setup intentionally excludes Paddle/OpenCV/MKL runtime DLLs and PP-OCRv5 models. `package-ocr-component.ps1` builds their deterministic, manifest-bearing optional component; the checksum file covers both release artifacts. No Portable ZIP is produced.
 
 The release script performs a self-contained .NET publish, so end users do not need to install the .NET 10 Runtime separately. WebView2 Runtime remains a system requirement.
 

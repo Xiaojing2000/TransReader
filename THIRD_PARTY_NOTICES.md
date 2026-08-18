@@ -24,6 +24,7 @@
 | --- | --- | --- | --- |
 | PP-OCRv5 mobile det/rec 推理模型（Paddle 3.0 official inference artifacts） | 本地 OCR | Apache-2.0 | https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/ |
 | Qwen3-1.7B Q4_K_M GGUF（revision `9bcdc2d703843e5e820383fe115eb0f7ad586643`） | 本地离线翻译/分析模型 | Apache-2.0 | https://huggingface.co/second-state/Qwen3-1.7B-GGUF |
+| Tencent Hy-MT2-1.8B Q4_K_M GGUF（revision `1cd5208700acedef4ef93019b6cfc148b8522d45`） | 本地专业翻译模型 | Apache-2.0 | https://huggingface.co/tencent/Hy-MT2-1.8B-GGUF |
 
 ## 说明
 

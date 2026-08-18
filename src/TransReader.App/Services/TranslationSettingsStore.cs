@@ -496,6 +496,92 @@ internal sealed class TranslationSettingsStore
         }
     }
 
+    /// <summary>Null means the setting predates component switches and needs migration.</summary>
+    public async Task<bool?> LoadOcrEnabledAsync()
+    {
+        await _ioGate.WaitAsync();
+        try { return await LoadOptionalBooleanAsync("ocrEnabled"); }
+        finally { _ioGate.Release(); }
+    }
+
+    public async Task SaveOcrEnabledAsync(bool enabled)
+    {
+        await _ioGate.WaitAsync();
+        try
+        {
+            var (stored, _) = await LoadStoredAsync();
+            await WriteStoredAsync(EnsureCompleteModels(stored) with { OcrEnabled = enabled });
+        }
+        finally { _ioGate.Release(); }
+    }
+
+    /// <summary>Null means the setting predates component switches and needs migration.</summary>
+    public async Task<bool?> LoadLocalAiEnabledAsync()
+    {
+        await _ioGate.WaitAsync();
+        try { return await LoadOptionalBooleanAsync("localAiEnabled"); }
+        finally { _ioGate.Release(); }
+    }
+
+    private async Task<bool?> LoadOptionalBooleanAsync(string propertyName)
+    {
+        if (!File.Exists(_settingsPath)) return null;
+        try
+        {
+            await using var stream = new FileStream(_settingsPath, FileMode.Open, FileAccess.Read, FileShare.Read,
+                16 * 1024, FileOptions.Asynchronous | FileOptions.SequentialScan);
+            using var document = await JsonDocument.ParseAsync(stream);
+            if (document.RootElement.ValueKind != JsonValueKind.Object ||
+                !document.RootElement.TryGetProperty(propertyName, out var value)) return null;
+            return value.ValueKind switch
+            {
+                JsonValueKind.True => true,
+                JsonValueKind.False => false,
+                _ => null
+            };
+        }
+        catch (JsonException) { return null; }
+        catch (IOException) { return null; }
+    }
+
+    public async Task SaveLocalAiEnabledAsync(bool enabled)
+    {
+        await _ioGate.WaitAsync();
+        try
+        {
+            var (stored, _) = await LoadStoredAsync();
+            await WriteStoredAsync(EnsureCompleteModels(stored) with { LocalAiEnabled = enabled });
+        }
+        finally { _ioGate.Release(); }
+    }
+
+    public async Task<string?> LoadSelectedLocalModelIdAsync()
+    {
+        await _ioGate.WaitAsync();
+        try
+        {
+            var (stored, _) = await LoadStoredAsync();
+            return string.IsNullOrWhiteSpace(stored.SelectedLocalModelId)
+                ? null
+                : stored.SelectedLocalModelId;
+        }
+        finally { _ioGate.Release(); }
+    }
+
+    public async Task SaveSelectedLocalModelIdAsync(string modelId)
+    {
+        await _ioGate.WaitAsync();
+        try
+        {
+            var (stored, _) = await LoadStoredAsync();
+            await WriteStoredAsync(EnsureCompleteModels(stored) with
+            {
+                SelectedLocalModelId = modelId
+            });
+        }
+        finally { _ioGate.Release(); }
+    }
+
     /// <summary>
     /// 读取 API Key，找不到或凭据库不可用时返回空串（兼容旧行为）。
     /// 需要区分"未配置"与"凭据库故障"时请改用 <see cref="TryReadApiKey"/>。
@@ -612,7 +698,10 @@ internal sealed class TranslationSettingsStore
         string LibraryAnalysisSource = "local",
         bool LocalFallbackEnabled = false,
         string TranslationDomainPreference = "auto",
-        Dictionary<string, string>? TranslationDomainHints = null);
+        Dictionary<string, string>? TranslationDomainHints = null,
+        bool? OcrEnabled = null,
+        bool? LocalAiEnabled = null,
+        string? SelectedLocalModelId = null);
 
     internal sealed record StoredModel(
         string Id,

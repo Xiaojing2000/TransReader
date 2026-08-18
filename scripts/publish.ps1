@@ -47,6 +47,9 @@ if (-not $SkipBuild) {
     & (Join-Path $PSScriptRoot 'build.ps1') -Configuration $Configuration
 }
 
+& (Join-Path $PSScriptRoot 'package-ocr-component.ps1') -OutputDirectory $releaseRoot
+$ocrComponentPath = Join-Path $releaseRoot 'TransReader-OCR-PP-OCRv5-mobile-win-x64.zip'
+
 $project = Join-Path $repositoryRoot 'src\TransReader.App\TransReader.App.csproj'
 dotnet publish $project -c $Configuration -r win-x64 --self-contained true `
     -p:Platform=x64 -p:Version=$Version -p:PublishSingleFile=false `
@@ -84,9 +87,10 @@ function Assert-ReleasePayload {
         'Microsoft.Web.WebView2.Core.dll',
         'TransOcrNative.dll',
         'TransOcrNative.Host.exe',
-        'paddle_inference.dll',
-        'models\PP-OCRv5_mobile_det_infer\inference.json',
-        'models\PP-OCRv5_mobile_rec_infer\inference.json'
+        'OCR.yaml',
+        'OcrPayloadManifest.json',
+        'abseil_dll.dll',
+        'polyclipping.dll'
     )
     $missing = $required | Where-Object { -not (Test-Path -LiteralPath (Join-Path $Directory $_) -PathType Leaf) }
     if ($missing) {
@@ -100,7 +104,12 @@ function Assert-ReleasePayload {
         $_.Name -like 'Microsoft.Windows.AI.*' -or
         $_.Name -like 'Microsoft.Windows.Widgets.*' -or
         $_.Name -like 'onnxruntime*.dll' -or
-        $_.Name -in @('DirectML.dll', 'Microsoft.ML.OnnxRuntime.dll', 'System.Numerics.Tensors.dll')
+        $_.Name -in @(
+            'DirectML.dll', 'Microsoft.ML.OnnxRuntime.dll', 'System.Numerics.Tensors.dll',
+            'paddle_inference.dll', 'opencv_world470.dll', 'mkldnn.dll', 'mklml.dll',
+            'libiomp5md.dll', 'common.dll'
+        ) -or
+        $_.FullName -like '*\models\PP-OCRv5_mobile_*'
     }
     if ($forbidden) {
         throw "Release payload contains development or unused component files: $($forbidden.Name -join ', ')"
@@ -108,8 +117,8 @@ function Assert-ReleasePayload {
 
     $payloadBytes = ($files | Measure-Object Length -Sum).Sum
     $payloadMiB = [Math]::Round($payloadBytes / 1MB, 2)
-    if ($payloadBytes -gt 510MB) {
-        throw "Release payload is $payloadMiB MiB, above the 510 MiB limit."
+    if ($payloadBytes -gt 180MB) {
+        throw "Release payload is $payloadMiB MiB, above the 180 MiB limit."
     }
     Write-Host "Validated release payload: $($files.Count) files, $payloadMiB MiB" -ForegroundColor Green
 }
@@ -132,11 +141,12 @@ $iss = Join-Path $repositoryRoot 'installer\TransReader.iss'
 & $iscc "/DMyAppVersion=$Version" "/DSourceDir=$publishDirectory" "/DOutputDir=$releaseRoot" $iss
 if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE." }
 
-$releaseFiles = @(Get-ChildItem -LiteralPath $releaseRoot -File |
-    Where-Object Name -EQ "TransReader-v$Version-win-x64-setup.exe" |
-    Sort-Object Name)
-if ($releaseFiles.Count -ne 1) {
-    throw "Expected exactly one Setup artifact for version $Version, found $($releaseFiles.Count)."
+$releaseFiles = @(
+    Get-Item -LiteralPath (Join-Path $releaseRoot "TransReader-v$Version-win-x64-setup.exe")
+    Get-Item -LiteralPath $ocrComponentPath
+) | Sort-Object Name
+if ($releaseFiles.Count -ne 2) {
+    throw "Expected Setup and OCR component artifacts for version $Version."
 }
 $checksumPath = Join-Path $releaseRoot "TransReader-v$Version-SHA256SUMS.txt"
 $checksumLines = foreach ($file in $releaseFiles) {

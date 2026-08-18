@@ -56,7 +56,7 @@ internal sealed class LibraryAnalysisOrchestrator
                 canApply ? LibraryAnalysisStatus.Ready : LibraryAnalysisStatus.NeedsReview,
                 overwriteManualFields: false, cancellationToken);
         }
-        catch (LocalAiNotInstalledException)
+        catch (Exception ex) when (ex is LocalAiNotInstalledException or OcrComponentUnavailableException)
         {
             await _repository.SetAnalysisStatusAsync(documentId, LibraryAnalysisStatus.Pending, cancellationToken);
             // 模型可能在卸载/修复中，稍后自动重新入队继续分析（消费方已将其移出 active，不会去重跳过）。

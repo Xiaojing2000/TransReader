@@ -13,6 +13,10 @@ internal sealed record SettingsViewContext(
     TranslationSettingsStore SettingsStore,
     /// <summary>本地模型管理器（安装/校验/卸载/状态事件）。</summary>
     LocalModelManager LocalModels,
+    /// <summary>可选 OCR 组件管理器。</summary>
+    OcrComponentManager OcrComponents,
+    /// <summary>OCR 工作进程，用于重新载入和冒烟检测。</summary>
+    OcrEngineProvider OcrEngineProvider,
     /// <summary>在线翻译用量统计。</summary>
     TranslationUsageStore UsageStore,
     /// <summary>当前文献库中等待自动分析的篇数（文献库整理状态展示）。</summary>
@@ -21,5 +25,7 @@ internal sealed record SettingsViewContext(
     Func<Task> EnqueuePendingAnalysesAsync,
     /// <summary>GitHub Releases 更新检查、下载与校验服务。</summary>
     UpdateService UpdateService,
+    /// <summary>宿主窗口句柄，用于初始化离线组件文件选择器。</summary>
+    nint WindowHandle,
     /// <summary>安装程序启动成功后关闭宿主应用。</summary>
     Action ExitApplication);

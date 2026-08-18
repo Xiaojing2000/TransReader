@@ -4,6 +4,27 @@ All notable changes to TransReader are documented here. The project follows Sema
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-08-19
+
+### Added
+
+- Optional, on-demand PP-OCRv5 component with verified GitHub/mirror downloads, resume support, offline ZIP import, safe staged installation, migration from v0.3.1, repair, reload, force reinstall, and uninstall actions.
+- Independent OCR and local-model enable switches. Disabled components stop their processes without deleting files or silently switching to an online provider.
+- Tencent Hy-MT2 1.8B Q4_K_M as the recommended local translation model; Qwen3 1.7B remains available for reader questions and library analysis.
+- Shared component status and trusted multi-source download behavior with progress, 30-second stall failover, size checks, and pinned SHA-256 verification.
+
+### Fixed
+
+- Installed builds now pass an absolute `OCR.yaml` path to PaddleOCR instead of relying on a compile-time source directory.
+- OCR startup now has a 60-second timeout, bounded native stderr diagnostics, worker cleanup, and retryable initialization after failure.
+- OCR reload restarts the worker and performs an actual recognition smoke test.
+
+### Changed
+
+- The base Setup no longer bundles approximately 333 MB of Paddle/OpenCV/MKL runtime files and PP-OCRv5 models; they ship as `TransReader-OCR-PP-OCRv5-mobile-win-x64.zip`.
+- Releases remain Setup-only with no Portable ZIP. The SHA-256 manifest covers both the Setup and OCR component.
+- The obsolete `gh-proxy.com` llama.cpp mirror was replaced with `ghproxy.net`.
+
 ## [0.3.1] - 2026-08-18
 
 ### Added

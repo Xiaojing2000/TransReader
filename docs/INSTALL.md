@@ -4,16 +4,17 @@
 
 ## Installer
 
-TransReader currently supports Windows x64 and publishes one supported Setup package. It installs per-user without administrator access and provides a Start Menu entry, optional desktop shortcut, and standard uninstaller. The optional local AI model is downloaded on demand instead of being bundled into the installer.
+TransReader currently supports Windows x64 and publishes one supported Setup package. It installs per-user without administrator access and provides a Start Menu entry, optional desktop shortcut, and standard uninstaller. OCR and local language models are on-demand components and are not bundled into the base installer.
 
-`X.Y.Z` is the version number, for example `TransReader-v0.3.1-win-x64-setup.exe`.
+`X.Y.Z` is the version number, for example `TransReader-v0.3.2-win-x64-setup.exe`. The Release also provides `TransReader-OCR-PP-OCRv5-mobile-win-x64.zip` for offline OCR import.
 
 ## Requirements
 
 - 64-bit Windows 10 20H1 (19041) or later.
 - An x64 processor with AVX support.
 - At least 8 GB RAM for online mode; 16 GB is recommended for local AI.
-- About 520 MB of free disk space, plus about 1.3 GB when local AI is installed.
+- About 166 MB for the base app; the optional OCR component adds about 333 MB.
+- Hy-MT2 1.8B or Qwen3 1.7B adds about 1.1–1.3 GB each; both together need about 2.5 GB.
 - Microsoft Edge WebView2 Runtime. It is normally included with Windows 11. Install the official runtime if the translation pane stays blank.
 
 ## Install
@@ -37,8 +38,9 @@ TransReader currently supports Windows x64 and publishes one supported Setup pac
 1. Open TransReader and choose a paper, manual, book, or scanned PDF.
 2. Select a translation mode:
    - **Online API:** first run has no configured model or API key. Open AI Center → Add Model, select a MiMo, Kimi, GLM, or DeepSeek template (or enter a custom OpenAI-compatible URL), use Discover Models if desired, then save and test it.
-   - **Local AI:** open AI Center → Local AI and choose Install. TransReader downloads Qwen3 1.7B and llama.cpp and verifies both with SHA-256.
-3. The original page remains on the left and the structured translation appears on the right. Scanned PDFs are recognized locally with PP-OCRv5.
+   - **Local translation:** open AI Center → Local Components. Hy-MT2 1.8B Q4_K_M is recommended for translation and is more practical on ordinary Windows PCs than the 7B build. Install Qwen3 1.7B separately for reader questions and library analysis.
+   - **OCR:** the first operation that needs recognition prompts for a roughly 112 MB download. You can also install it under Local Components or import the offline ZIP from the Release.
+3. The original page remains on the left and the structured translation appears on the right. OCR and local models each have independent enable, verify, reload, repair, force-reinstall, and uninstall controls.
 4. Select translated text to ask for an explanation or continue a contextual conversation.
 5. Import long-term reading material into the library to retain progress, thumbnails, OCR, and translation caches.
 
@@ -70,7 +72,7 @@ Install or repair Microsoft Edge WebView2 Runtime, then restart TransReader.
 
 ### OCR initialization fails
 
-Do not remove `models`, `TransOcrNative.Host.exe`, `TransReader.App.pri`, or adjacent DLLs. Rerun Setup to repair the installation.
+Open AI Center → Local Components → OCR, then try Reload followed by Install / Smart Repair. If needed, use Force Reinstall or download the offline OCR ZIP from the same Release and choose Import Offline Package. Components live under `%LOCALAPPDATA%\TransReader\ocr\versions`; the error view preserves the actual PaddleOCR diagnostic output.
 
 ### An online API cannot connect
 
@@ -78,4 +80,4 @@ Check the OpenAI-compatible Base URL, exact model name, account balance, and quo
 
 ### A local AI download was interrupted
 
-Choose Install again to resume. TransReader can switch between the listed sources and verifies file size and SHA-256 before installation.
+Choose Install again to resume. OCR switches between the GitHub Release and `ghproxy.net`; local models switch between Hugging Face and `hf-mirror`. Every component is verified by file size and SHA-256.

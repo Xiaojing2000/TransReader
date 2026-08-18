@@ -162,6 +162,37 @@ public sealed class MultimodalTranslatorTests
     }
 
     [Fact]
+    public async Task HyMtUsesOfficialSamplingAndTranslationOnlyUserPrompt()
+    {
+        var handler = new CapturingHandler(CreateSse("专业译文"));
+        using var client = new HttpClient(handler);
+        var translator = new OpenAiCompatibleTranslator(client);
+        var settings = new TranslationSettings(
+            "http://127.0.0.1:32123/v1", "hy-mt2-1.8b-q4-k-m", "中文", "none",
+            IsMultimodal: false, Temperature: 0.7, DisableThinking: true,
+            ProviderId: "local-hy-mt2-1.8b", CacheIdentity: "local:hymt:test",
+            Provider: TranslationProvider.Local);
+
+        var result = await translator.TranslateTextStreamingAsync(
+            settings, string.Empty,
+            new TextTranslationRequest("Source paragraph", new OcrPage(10, 10, []), 1,
+                DocumentTranslationContext.Empty));
+
+        Assert.Equal("专业译文", result.Text);
+        Assert.Contains("\"temperature\":0.7", handler.Body);
+        Assert.Contains("\"top_p\":0.6", handler.Body);
+        Assert.Contains("\"top_k\":20", handler.Body);
+        Assert.Contains("\"repeat_penalty\":1.05", handler.Body);
+        Assert.DoesNotContain("chat_template_kwargs", handler.Body);
+        Assert.DoesNotContain("/no_think", handler.Body);
+        using var json = JsonDocument.Parse(handler.Body);
+        var messages = json.RootElement.GetProperty("messages");
+        Assert.Single(messages.EnumerateArray());
+        Assert.Equal("user", messages[0].GetProperty("role").GetString());
+        Assert.Contains("翻译为中文", messages[0].GetProperty("content").GetString());
+    }
+
+    [Fact]
     public async Task TruncatedStreamThrowsInsteadOfReturningPartialText()
     {
         var builder = new StringBuilder();

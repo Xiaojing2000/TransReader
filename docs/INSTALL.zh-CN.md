@@ -4,16 +4,17 @@
 
 ## 安装包
 
-TransReader 当前只支持 Windows x64，并只发布一个受支持的 Setup 安装包。它安装到当前用户目录，创建开始菜单项，可选桌面快捷方式和标准卸载入口，不需要管理员权限。本地 AI 模型在首次使用时按需下载，不会塞进安装包。
+TransReader 当前只支持 Windows x64，并只发布一个受支持的 Setup 安装包。它安装到当前用户目录，创建开始菜单项、可选桌面快捷方式和标准卸载入口，不需要管理员权限。OCR 与本地大模型均为按需组件，不会塞进基础安装包。
 
-`X.Y.Z` 是版本号，例如 `TransReader-v0.3.1-win-x64-setup.exe`。
+`X.Y.Z` 是版本号，例如 `TransReader-v0.3.2-win-x64-setup.exe`。Release 同时提供 `TransReader-OCR-PP-OCRv5-mobile-win-x64.zip`，用于断网环境导入 OCR。
 
 ## 系统要求
 
 - Windows 10 20H1（19041）或更高版本，64 位。
 - 支持 AVX 指令集的 x64 CPU。
 - 在线模式建议至少 8 GB 内存；本地 AI 建议 16 GB。
-- 约 520 MB 可用磁盘空间；安装本地 AI 后还需约 1.3 GB。
+- 基础安装约 166 MB；OCR 可选组件另需约 333 MB。
+- Hy-MT2 1.8B 或 Qwen3 1.7B 各需约 1.1–1.3 GB；同时安装约需 2.5 GB。
 - Microsoft Edge WebView2 Runtime。Windows 11 通常已自带；如果译文区域无法显示，请安装微软官方 WebView2 Runtime。
 
 ## 安装
@@ -37,8 +38,9 @@ TransReader 当前只支持 Windows x64，并只发布一个受支持的 Setup �
 1. 打开 TransReader，点击“打开 PDF”，选择论文、说明书、电子书或扫描文档。
 2. 选择翻译方式：
    - **在线 API**：首次启动的在线模型列表和 API Key 都为空。进入“AI 中心 → 添加模型”，选择 MiMo、Kimi、GLM、DeepSeek 模板或自定义 OpenAI 兼容地址；输入 URL 和 Key 后可点击“检测模型”，选择模型并保存。
-   - **本地 AI**：进入“AI 中心 → 本地 AI”，点击安装。应用会下载 Qwen3 1.7B 与 llama.cpp，并在下载完成后进行 SHA-256 校验。
-3. 页面左侧保留原始 PDF，右侧显示结构化译文。扫描 PDF 会自动调用本地 PP-OCRv5。
+   - **本地翻译**：进入“AI 中心 → 本地组件”，推荐安装 Hy-MT2 1.8B Q4_K_M；它比 7B 更适合普通 Windows 电脑。Qwen3 1.7B 用于阅读问答和文献整理，可单独安装。
+   - **OCR**：第一次真正需要文字识别时会提示下载约 112 MB 压缩组件。也可在“本地组件”中安装，或导入 Release 的离线 ZIP。
+3. 页面左侧保留原始 PDF，右侧显示结构化译文。OCR 和本地大模型安装完成后均可独立开关、校验、重新载入、智能修复或强制重装。
 4. 在译文中选中文字，可直接请求解释、概念梳理或继续追问。
 5. 将经常阅读的资料导入文献库，TransReader 会保存阅读进度、缩略图、OCR 和翻译缓存。
 
@@ -70,7 +72,7 @@ API Key 只保存在 Windows 凭据库，不会写进 `settings.json`，也不�
 
 ### OCR 初始化失败
 
-不要从安装目录删除 `models`、`TransOcrNative.Host.exe`、`TransReader.App.pri` 或旁边的 DLL。重新运行 Setup 可修复安装。
+进入“AI 中心 → 本地组件 → OCR 文字识别”，依次尝试“重新载入”和“安装 / 智能修复”。仍失败时可“强制重新安装”，或从同一 Release 下载离线 OCR ZIP 后选择“导入离线包”。组件位于 `%LOCALAPPDATA%\TransReader\ocr\versions`，错误界面会显示原生 PaddleOCR 的实际失败原因。
 
 ### 在线 API 无法连接
 
@@ -78,4 +80,4 @@ API Key 只保存在 Windows 凭据库，不会写进 `settings.json`，也不�
 
 ### 本地 AI 下载中断
 
-重新点击安装即可续传。应用会在官方源与镜像之间切换，并在安装前校验文件大小和 SHA-256。
+重新点击安装即可续传。OCR 在 GitHub Release 与 `ghproxy.net` 间自动切换；本地模型在 Hugging Face 与 `hf-mirror` 间切换。所有组件都会校验大小和 SHA-256。

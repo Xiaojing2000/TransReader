@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "componentVersion": "paddleocr-ppocrv5-mobile-cpu-v2",
+  "architecture": "win-x64",
+  "files": [
+    { "path": "abseil_dll.dll", "size": 1531904, "sha256": "2a09e1b9dda30f5ffb61dc8d302aca8a83e7dbf04fa96e5c225346c30e84b8e4" },
+    { "path": "common.dll", "size": 687104, "sha256": "241495e49331319317802889fe15b0d201bb42157fc0756dbf3b1644269bb047" },
+    { "path": "libiomp5md.dll", "size": 1726848, "sha256": "bc9e17190505a3beda7feedd90ba3ab7b6dc3f7ca5d980b2140c53ae459fc5ae" },
+    { "path": "mkldnn.dll", "size": 47322112, "sha256": "a25df93583067d58b84f7b7a4d645d1c6881770d01879129455ef893e4c2673d" },
+    { "path": "mklml.dll", "size": 92649344, "sha256": "e2a7fd93e1534568626cffe22676b15164a5a2b3a62f1919a55993478b45811e" },
+    { "path": "models/PP-OCRv5_mobile_det_infer/inference.json", "size": 229777, "sha256": "05feef1acb00aa4cd7362b15f7f501fc4f99d7b1fa73c1c871e0c7b1504b0f5c" },
+    { "path": "models/PP-OCRv5_mobile_det_infer/inference.pdiparams", "size": 4692937, "sha256": "afa1820cb16c1fd0dad589d0f8b389139061c1ef6d68019685fd07be997dda5b" },
+    { "path": "models/PP-OCRv5_mobile_det_infer/inference.yml", "size": 903, "sha256": "98069072e1b6b37d727fd9d9f11725faa46d6ea0de012f2ed26caea011c37699" },
+    { "path": "models/PP-OCRv5_mobile_rec_infer/inference.json", "size": 217724, "sha256": "24587345250c7332d0fc6f9a44e794d078cdaeb64c302fef906f325619de2569" },
+    { "path": "models/PP-OCRv5_mobile_rec_infer/inference.pdiparams", "size": 16458665, "sha256": "2460da90875937c94db97eba74ae3d9e5d4c4c57c42f1f41531c09a26bcc771a" },
+    { "path": "models/PP-OCRv5_mobile_rec_infer/inference.yml", "size": 148345, "sha256": "5dfeb2777f6d0db8177d8128a8acfcf6e6276dc4ac73ea3bf0dc06d6a5e85d8e" },
+    { "path": "opencv_world470.dll", "size": 63602176, "sha256": "af2c759d580327554b30f3c750943b4e72d8eefc592d536e094e5d6fa984b91e" },
+    { "path": "paddle_inference.dll", "size": 121158656, "sha256": "4b1c820e7f46eb02771c020c471ae84164bf316e7b60bee7a3fbfa4a63771d4b" },
+    { "path": "polyclipping.dll", "size": 516096, "sha256": "dd5ece5a0ffd2c58d974b699c49a4f91fa9d605566be6de77b0c9a96ec412256" },
+    { "path": "THIRD_PARTY_NOTICES.md", "size": 3219, "sha256": "597639aa71c21018bc0ffda2e1c62af784fbd925ad39480008855fc11a15d7c6" }
+  ]
+}

@@ -29,20 +29,37 @@ internal sealed class LocalTextTranslationService
     /// <summary>清除全部内存断点（文档关闭、模式切换或用户显式"重新翻译"时调用）。</summary>
     public void ClearAllResumePoints() => _resumePoints.Clear();
 
-    public TranslationProfile CreateProfile(string targetLanguage, Uri? baseUri = null) => new(
-        LocalAiManifest.ProviderId,
+    public TranslationProfile CreateProfile(
+        string targetLanguage,
+        Uri? baseUri = null,
+        LocalModelDescriptor? descriptor = null)
+    {
+        descriptor ??= _models.PreferredTranslationModel;
+        var modelTargetLanguage = descriptor.Purpose == LocalModelPurpose.Translation
+            ? NormalizeHyMtLanguage(targetLanguage)
+            : targetLanguage;
+        return new TranslationProfile(
+        descriptor.ProviderId,
         new TranslationSettings(
             (baseUri ?? new Uri("http://127.0.0.1:1/v1")).ToString().TrimEnd('/'),
-            LocalAiManifest.ModelId,
-            targetLanguage,
+            descriptor.Id,
+            modelTargetLanguage,
             "none",
             IsMultimodal: false,
-            Temperature: 0.1,
+            Temperature: descriptor.Temperature,
             DisableThinking: true,
-            ProviderId: LocalAiManifest.ProviderId,
-            CacheIdentity: LocalAiManifest.CacheIdentity,
+            ProviderId: descriptor.ProviderId,
+            CacheIdentity: descriptor.CacheIdentity,
             Provider: TranslationProvider.Local),
         string.Empty);
+    }
+
+    private static string NormalizeHyMtLanguage(string language) => language switch
+    {
+        "简体中文" => "中文",
+        "英文" => "英语",
+        _ => language
+    };
 
     public async Task<LocalPageTranslation> TranslateAsync(
         string resumeKey,
@@ -55,8 +72,9 @@ internal sealed class LocalTextTranslationService
         if (chunks.Count == 0)
             throw new TranslationException("本页 OCR 没有识别到可翻译的文字。");
 
-        using var session = await _models.OpenSessionAsync(LocalAiPriority.ForegroundTranslation, cancellationToken).ConfigureAwait(false);
-        var runtimeProfile = CreateProfile(cacheProfile.Settings.TargetLanguage, session.BaseUri);
+        using var session = await _models.OpenSessionAsync(
+            LocalAiPriority.ForegroundTranslation, LocalModelPurpose.Translation, cancellationToken).ConfigureAwait(false);
+        var runtimeProfile = CreateProfile(cacheProfile.Settings.TargetLanguage, session.BaseUri, session.Descriptor);
         var completed = _resumePoints.TryGetValue(resumeKey, out var saved)
             ? saved.ToList()
             : [];

@@ -107,7 +107,7 @@ int main(int argc, char** argv) {
     _setmode(_fileno(stdin), _O_BINARY);
 #endif
     if (argc < 3) {
-        std::cerr << "usage: trans_ocr_host <responsePipeHandle> <modelDirectory> [threads]\n";
+        std::cerr << "usage: trans_ocr_host <responsePipeHandle> <modelDirectory> <pipelineConfigPath> [threads]\n";
         return 2;
     }
 
@@ -125,9 +125,14 @@ int main(int argc, char** argv) {
     }
 #endif
 
-    const int threads = argc > 3 ? std::atoi(argv[3]) : 8;
+    if (argc < 4) {
+        std::cerr << "pipeline config path is required\n";
+        return 2;
+    }
+    const int threads = argc > 4 ? std::atoi(argv[4]) : 8;
     const std::string config =
         std::string("{\"modelDirectory\":\"") + json_escape(argv[2]) +
+        "\",\"pipelineConfigPath\":\"" + json_escape(argv[3]) +
         "\",\"threads\":" + std::to_string(threads) + "}";
 
     trans_ocr_engine engine = nullptr;

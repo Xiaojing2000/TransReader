@@ -74,7 +74,8 @@ if (-not $SkipNative) {
         throw 'TransOcrNative.AbiSmoke.exe was not produced.'
     }
     $modelsPath = (Join-Path $repositoryRoot 'models').Replace('\', '/')
-    & $smokeTest.FullName $modelsPath
+    $pipelineConfigPath = (Join-Path $repositoryRoot 'third_party\PaddleOCR\deploy\cpp_infer\src\configs\OCR.yaml').Replace('\', '/')
+    & $smokeTest.FullName $modelsPath $pipelineConfigPath
     if ($LASTEXITCODE -ne 0) {
         throw "Native ABI smoke test failed with exit code $LASTEXITCODE."
     }

@@ -21,17 +21,20 @@ internal sealed class LibraryClassificationService
     private static readonly int[] RetryBackoffSeconds = [1, 3];
     private readonly PageOcrCache _ocrCache;
     private readonly OcrCoordinator _ocrCoordinator;
+    private readonly OcrComponentManager _ocrComponents;
     private readonly LocalModelManager _models;
     private readonly OpenAiCompatibleTranslator _translator;
 
     public LibraryClassificationService(
         PageOcrCache ocrCache,
         OcrCoordinator ocrCoordinator,
+        OcrComponentManager ocrComponents,
         LocalModelManager models,
         OpenAiCompatibleTranslator translator)
     {
         _ocrCache = ocrCache;
         _ocrCoordinator = ocrCoordinator;
+        _ocrComponents = ocrComponents;
         _models = models;
         _translator = translator;
     }
@@ -45,7 +48,8 @@ internal sealed class LibraryClassificationService
     /// <summary>当前来源下整理功能是否就绪（本地=模型已装；在线=profile 已配置）。</summary>
     public async Task<bool> IsReadyAsync()
     {
-        if (AnalysisSource == "local") return _models.IsInstalled;
+        if (!_ocrComponents.IsEnabled || !_ocrComponents.IsInstalled) return false;
+        if (AnalysisSource == "local") return _models.IsEnabled && _models.IsInstalled;
         var profile = ResolveOnlineProfileAsync is null ? null : await ResolveOnlineProfileAsync();
         return profile is { IsConfigured: true };
     }
@@ -56,6 +60,8 @@ internal sealed class LibraryClassificationService
         LocalAiPriority priority,
         CancellationToken cancellationToken)
     {
+        if (!_ocrComponents.IsEnabled || !_ocrComponents.IsInstalled)
+            throw new OcrComponentUnavailableException("文献正在等待 OCR 组件启用并安装，准备完成后会继续分析。");
         var useLocal = AnalysisSource == "local";
         if (useLocal && !_models.IsInstalled) throw new LocalAiNotInstalledException(
             "文献正在等待本地 AI 模型安装，安装后会自动继续分析。");
@@ -70,12 +76,12 @@ internal sealed class LibraryClassificationService
                 session = await _models.OpenSessionAsync(priority, cancellationToken);
                 settings = new TranslationSettings(
                     session.BaseUri.AbsoluteUri,
-                    LocalAiManifest.ModelId,
+                    session.Descriptor.Id,
                     "简体中文",
                     "none",
                     IsMultimodal: false,
-                    ProviderId: LocalAiManifest.ProviderId,
-                    CacheIdentity: LocalAiManifest.CacheIdentity,
+                    ProviderId: session.Descriptor.ProviderId,
+                    CacheIdentity: session.Descriptor.CacheIdentity,
                     Provider: TranslationProvider.Local);
                 apiKey = string.Empty;
             }
